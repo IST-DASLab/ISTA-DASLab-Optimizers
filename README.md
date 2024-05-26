@@ -9,7 +9,7 @@ run the installation script.
 ```shell
 git clone git@github.com:IST-DASLab/ISTA-DASLab-Optimizers.git
 cd ISTA-DASLab-Optimizers
-bash install.sh
+source install.sh
 ```
 
 ## How to use optimizers?
