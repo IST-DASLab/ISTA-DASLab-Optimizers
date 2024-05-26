@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 ENV_NAME=ista_daslab_optimizers
 
@@ -7,9 +7,6 @@ module load cuda/12.2
 
 echo ">>>>> Creating environment \"${ENV_NAME}\""
 conda create --name $ENV_NAME python=3.9 -y
-
-echo ">>>>> Running conda init..."
-conda init bash
 
 echo ">>>>> Activating environment"
 conda activate $ENV_NAME
