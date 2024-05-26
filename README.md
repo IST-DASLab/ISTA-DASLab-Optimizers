@@ -4,10 +4,11 @@ the Distributed Algorithms and Systems lab at Institute of Science and Technolog
 
 ### Installation
 We provide a script `install.sh` that creates a new environment, installs requirements 
-and then builds the optimizers project. We use `python3 setup.py install` because we are 
-currently facing issues with installing the extension as a PyPi package, but this will be
-fixed as soon as possible.
+and then builds the optimizers project. First of all, you have to clone this repository, then 
+run the installation script.
 ```shell
+git clone git@github.com:IST-DASLab/ISTA-DASLab-Optimizers.git
+cd ISTA-DASLab-Optimizers
 bash install.sh
 ```
 

@@ -14,9 +14,5 @@ conda activate $ENV_NAME
 echo "Installing packages..."
 pip3 install torch torchvision torchaudio wandb gpustat
 
-cd ~
-git clone git@github.com:IST-DASLab/ISTA-DASLab-Optimizers.git
-cd ISTA-DASLab-Optimizers
-
 echo "Installing packages..."
 pip3 install .
