@@ -1,8 +1,8 @@
 #!/bin/bash
 
 module load cuda/12.2
-conda create --name ist_daslab_optimizers python=3.9 -y
-conda activate ist_daslab_optimizers
+conda create --name ista_daslab_optimizers python=3.9 -y
+conda activate ista_daslab_optimizers
 pip3 install torch torchvision torchaudio
 pip3 install wandb gpustat
 cd ~
