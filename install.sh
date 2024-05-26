@@ -1,5 +1,3 @@
-#!/usr/bin/bash
-
 ENV_NAME=ista_daslab_optimizers
 
 echo ">>>>> Loading CUDA 12.2 module"
