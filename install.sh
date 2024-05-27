@@ -10,7 +10,7 @@ echo ">>>>> Activating environment"
 conda activate $ENV_NAME
 
 echo ">>>>> Installing packages..."
-pip3 install torch torchvision torchaudio wandb gpustat
+pip3 install wheel build torch torchvision torchaudio wandb gpustat
 
 echo ">>>>> Installing packages..."
 pip3 install .
