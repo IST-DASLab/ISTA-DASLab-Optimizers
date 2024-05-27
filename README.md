@@ -15,6 +15,13 @@ cd ISTA-DASLab-Optimizers
 source install.sh
 ```
 
+### ⚠️ Important Notice ⚠️
+We noticed it is useful to compile the kernels for each individual CUDA capability separately. For example, for CUDA capability (CC) 8.6, 
+the CUDA kernels for `MicroAdam` will be installed in the package `micro_adam_sm86`, while for CC 9.0 it will be installed in the package
+`micro_adam_sm90`. Please install this library for each system where the CC is different to cover all. The code will automatically detect
+the CC version and import the correct package if installed, otherwise will throw an error. The code that dynamically detects the CC version
+can be found [here](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers/blob/main/ista_daslab_optimizers/tools.py#L17).
+
 ## How to use optimizers?
 
 ### MicroAdam optimizer
