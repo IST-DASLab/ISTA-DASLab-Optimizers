@@ -2,6 +2,9 @@
 This repository contains optimization algorithms for Deep Learning developed by 
 the Distributed Algorithms and Systems lab at Institute of Science and Technology Austria.
 
+## Curent project status (as of May 27th, 2024)
+We are currently working on solving the issues with the installation via `pip`. 
+
 ### Installation
 We provide a script `install.sh` that creates a new environment, installs requirements 
 and then builds the optimizers project. First of all, you have to clone this repository, then 
