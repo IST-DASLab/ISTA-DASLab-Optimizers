@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 import torch
 
@@ -11,14 +11,7 @@ setup(
     author_email='ionut-vlad.modoranu@ist.ac.at',
     description='Deep Learning optimizers developed in the Distributed Algorithms and Systems group '
                 '(DASLab) @ Institute of Science and Technology Austria (ISTA).',
-    py_modules=[
-        'ista_daslab_optimizers',
-    ],
-    # install_requires=[
-    #     'torch>=2.3.0',
-    #     'gpustat',
-    #     'wandb',
-    # ],
+    packages=find_packages(),
     url='https://github.com/IST-DASLab/ISTA-DASLab-Optimizers',
     ext_modules=[
         CUDAExtension(
