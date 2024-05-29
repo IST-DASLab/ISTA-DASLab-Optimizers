@@ -2,7 +2,7 @@
 This repository contains optimization algorithms for Deep Learning developed by 
 the Distributed Algorithms and Systems lab at Institute of Science and Technology Austria.
 
-## Curent project status (as of May 27th, 2024)
+## Current project status (as of May 27th, 2024)
 We are currently working on solving the issues with the installation via `pip`. 
 
 ### Installation
@@ -24,6 +24,12 @@ dynamically detects the CC version can be found
 [here](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers/blob/main/ista_daslab_optimizers/tools.py#L17).
 
 ## How to use optimizers?
+
+We provide a minimal working example with ResNet-18 and CIFAR-10 for optimizers `micro-adam`, `acdc`, `sparse-mfac`, `dense-mfac`:
+```shell
+OPTIMIZER=micro-adam # or any other optimizer listed above
+bash run_${OPTIMIZER}.sh
+```
 
 ### MicroAdam optimizer
 ```python
