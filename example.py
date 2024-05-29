@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore")
+import psutil
 import os
 import argparse
 import math
@@ -5,6 +8,9 @@ import time
 import numpy as np
 import random
 import torch
+import gpustat
+import wandb
+
 from torch.nn.functional import cross_entropy
 from torchvision.models import resnet18
 import torchvision.transforms as transforms
@@ -12,13 +18,15 @@ import torchvision.datasets as datasets
 from timm.optim.optim_factory import param_groups_weight_decay
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import gpustat
-
 from ista_daslab_optimizers import MicroAdam
 
 def get_arg_parse():
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('--wandb_entity', type=str, default=None, help='The wandb entity')
+    parser.add_argument('--wandb_project', type=str, required=True, help='The wandb project inside "ist" owner.')
+    parser.add_argument('--wandb_group', type=str, required=True, help='The wandb group in the project.')
+    parser.add_argument('--wandb_job_type', type=str, default=None, required=True, help='The wandb job type')
+    parser.add_argument('--wandb_name', type=str, required=True, default=None, help='The name for the experiment in wandb runs')
     parser.add_argument('--model',
                         type=str,
                         required=True,
@@ -37,7 +45,7 @@ def get_arg_parse():
                         help='Optimizer to use for training')
     parser.add_argument('--epochs', type=int, required=True, help='The number of epochs to train the model for')
     parser.add_argument('--batch_size', type=int, required=True, help='Batchsize to use for training.')
-    parser.add_argument('--learning_rate', type=float, default=1e-3, required=True, help='Learning rate to use for training.')
+    parser.add_argument('--lr', type=float, default=1e-3, required=True, help='Learning rate to use for training.')
     parser.add_argument('--momentum', type=float, default=0.9, help='Momentum to use for training.')
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay to use for training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
@@ -47,6 +55,9 @@ def get_arg_parse():
     parser.add_argument('--precision', type=str, default='bf16', help='Data type to convert the model to')
 
     return parser.parse_args()
+
+def get_ram_mem_usage():
+    return round(psutil.Process().memory_info().rss / (2 ** 30), 2)
 
 def get_gpu_mem_usage():
     gpus = gpustat.new_query().gpus
@@ -121,11 +132,17 @@ def set_lr(optimizer, lr):
 
 
 @torch.no_grad()
-def test(model, data, loss_type):
+def test(model, data, precision):
     loss, correct, test_dataset_size = 0, 0, 0
-    for x, y in tqdm(data):
+    progress = tqdm(data)
+    progress.set_description('Evaluating...')
+    for x, y in progress:
         x = x.cuda(non_blocking=True)
         y = y.cuda(non_blocking=True)
+
+        if precision in ['bf16', 'bfloat16']:
+            x = x.to(dtype=torch.bfloat16)
+
         y_hat = model(x)
         test_dataset_size += x.shape[0]
 
@@ -143,11 +160,22 @@ def beautify_time(ss):
     ss %= 60
     return f'{hh}h {mm}m {ss}s'
 
+
+def setup_wandb(args):
+    return wandb.init(
+        project=args.wandb_project,
+        job_type=args.wandb_job_type,
+        entity=args.wandb_entity,
+        group=args.wandb_group,
+        name=args.wandb_name,
+        config=args,
+        settings=wandb.Settings(start_method='fork'))
+
 def main():
     args = get_arg_parse()
-
+    setup_wandb(args)
     set_all_seeds(args.seed)
-    model = get_model(args.model, args.dataset_name, args.precision)
+    model = get_model(args.model, args.dataset_name, args.precision).to('cuda:0')
     optimizer = get_optimizer(args, model)
     train_data, test_data = get_datasets(args.dataset_name, args.dataset_path)
     train_loader = DataLoader(dataset=train_data, batch_size=args.batch_size, shuffle=True)
@@ -170,6 +198,9 @@ def main():
             x = x.cuda(non_blocking=True)
             y = y.cuda(non_blocking=True)
 
+            if args.precision in ['bf16', 'bfloat16']:
+                x = x.to(dtype=torch.bfloat16)
+
             crt_batch_size = x.shape[0]
             train_size += crt_batch_size
 
@@ -185,28 +216,39 @@ def main():
 
             train_correct += (torch.argmax(y_hat, 1) == y).sum().item()
 
-            loss_str = f'Loss Batch={step_loss / crt_batch_size:.2f} | Loss Epoch={train_loss / train_size:.2f}'
+            loss_str = f'[Epoch {epoch}/{args.epochs}] Loss Batch={step_loss / crt_batch_size:.2f} | Loss Epoch={train_loss / train_size:.2f}'
             progress.set_description(f'{loss_str}')
         # end epoch
         train_elapsed = time.time() - train_start
 
         test_start = time.time()
         model.eval()
-        test_correct, test_loss, test_size = test(model, test_loader, loss_type=args.loss_type)
+        test_correct, test_loss, test_size = test(model, test_loader, args.precision)
         model.train()
         test_elapsed = time.time() - test_start
 
         train_loss /= train_size
-        train_accuracy = train_correct / train_size
+        train_accuracy = round(train_correct / train_size * 100, 2)
         test_loss /= test_size
-        test_accuracy = test_correct / test_size
+        test_accuracy = round(test_correct / test_size * 100, 2)
 
-        print(f'{"-" * 30}'
-              f'Epoch {epoch}/{args.epochs}:\n'
-              f'Loss Train/Test:    \t{train_loss:.4f} / {test_loss:.4f}\n'
-              f'Accuracy Train/Test:\t{train_accuracy*100:.2f}% / {test_accuracy*100:.2f}%\n'
-              f'Elapsed: Train/Test:\t{beautify_time(train_elapsed)} / {beautify_time(test_elapsed)}\n'
-              f'Current/Base LR:    \t{lr} / {args.base_lr}\n')
+        print(f'Loss Train/Test:    \t{train_loss:.4f} / {test_loss:.4f}\n'
+              f'Accuracy Train/Test:\t{train_accuracy:.2f}% / {test_accuracy:.2f}%\n'
+              f'Elapsed Train/Test: \t{beautify_time(train_elapsed)} / {beautify_time(test_elapsed)}\n'
+              f'Current/Base LR:    \t{lr} / {args.lr}\n')
+
+        wandb.log({
+            'epoch/epoch': epoch,
+            'epoch/train_loss': train_loss,
+            'epoch/train_accuracy': train_accuracy,
+            'epoch/test_loss': test_loss,
+            'epoch/test_accuracy': test_accuracy,
+            'epoch/train_elapsed': train_elapsed,
+            'epoch/test_elapsed': test_elapsed,
+            'epoch/gpu_mem_usage': get_gpu_mem_usage(),
+            'epoch/ram_mem_usage': get_ram_mem_usage(),
+            'epoch/lr': lr,
+        })
 
 
 if __name__ == '__main__':
