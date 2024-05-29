@@ -42,8 +42,8 @@ def get_arg_parse():
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay to use for training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     parser.add_argument('--m', type=int, required=True, help='Window size for micro-adam, sparse-mfac')
-    parser.add_argument('--k', type=int, required=True, help='Gradient density for micro-adam, sparse-mfac')
-    parser.add_argument('--ef_quant_bucket_size', type=float, default=0, help='Bucket size used for EF quantization')
+    parser.add_argument('--k', type=float, required=True, help='Gradient density for micro-adam, sparse-mfac')
+    parser.add_argument('--ef_quant_bucket_size', type=int, default=0, help='Bucket size used for EF quantization')
     parser.add_argument('--precision', type=str, default='bf16', help='Data type to convert the model to')
 
     return parser.parse_args()
