@@ -147,7 +147,7 @@ def main():
     args = get_arg_parse()
 
     set_all_seeds(args.seed)
-    model = get_model(args.model, args.dataset_name)
+    model = get_model(args.model, args.dataset_name, args.precision)
     optimizer = get_optimizer(args, model)
     train_data, test_data = get_datasets(args.dataset_name, args.dataset_path)
     train_loader = DataLoader(dataset=train_data, batch_size=args.batch_size, shuffle=True)
