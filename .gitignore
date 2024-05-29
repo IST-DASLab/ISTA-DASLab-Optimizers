@@ -8,3 +8,6 @@
 /dataSources.local.xml
 
 .idea/
+build/
+dist/
+*.egg-info/
