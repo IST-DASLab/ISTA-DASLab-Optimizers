@@ -222,15 +222,15 @@ class MicroAdam(torch.optim.Optimizer):
 
     def _log(self, norm_g, norm_u, norm_e, sparsity_u, elapsed_step):
         if self.steps % self.log_interval == 0:
-            wandb_data = dict(
-                optimizer_steps=self.steps,
-                gpu_mem_usage=get_gpu_mem_usage(),
-                norm_g=math.sqrt(norm_g),
-                norm_u=math.sqrt(norm_u),
-                norm_error=math.sqrt(norm_e),
-                sparsity_u=sparsity_u / self.model_size * 100.,
-                elapsed_step=elapsed_step
-            )
+            wandb_data = {
+                'step/optimizer_steps': self.steps,
+                'step/gpu_mem_usage': get_gpu_mem_usage(),
+                'step/norm_g': math.sqrt(norm_g),
+                'step/norm_u': math.sqrt(norm_u),
+                'step/norm_error': math.sqrt(norm_e),
+                'step/sparsity_u': sparsity_u / self.model_size * 100.,
+                'step/elapsed_step': elapsed_step,
+            }
 
             if not is_initialized() or get_rank() == 0:
                 wandb.log(wandb_data, commit=False)
