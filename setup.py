@@ -26,8 +26,16 @@ setup(
                 'setup_micro_adam/microadam_asymm_block_quant_inv.cu',
                 'setup_micro_adam/microadam_asymm_global_quant.cu',
                 'setup_micro_adam/microadam_asymm_global_quant_inv.cu',
-            ]
-        )
+            ]),
+        CUDAExtension(
+            name=f'sparse_mfac_sm{cc[0]}{cc[1]}',
+            sources=[
+                'setup_sparse_mfac/sparsemfac.cpp',
+                'setup_sparse_mfac/sparsemfac_SP_kernel.cu',
+                'setup_sparse_mfac/sparsemfac_LCG_kernel.cu',
+                'setup_sparse_mfac/utils.cu'
+            ]),
+
     ],
     cmdclass={'build_ext': BuildExtension}
 )
