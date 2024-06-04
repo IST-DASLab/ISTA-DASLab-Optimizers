@@ -15,26 +15,31 @@ setup(
     url='https://github.com/IST-DASLab/ISTA-DASLab-Optimizers',
     ext_modules=[
         CUDAExtension(
-            name=f'micro_adam_sm{cc[0]}{cc[1]}',
+            name=f'cuda_daslab_tools_sm{cc[0]}{cc[1]}',
             sources=[
-                'setup_micro_adam/microadam.cpp',
-                'setup_micro_adam/microadam_update.cu',
-                'setup_micro_adam/microadam_tools.cu',
-                'setup_micro_adam/microadam_symm_block_quant.cu',
-                'setup_micro_adam/microadam_symm_block_quant_inv.cu',
-                'setup_micro_adam/microadam_asymm_block_quant.cu',
-                'setup_micro_adam/microadam_asymm_block_quant_inv.cu',
-                'setup_micro_adam/microadam_asymm_global_quant.cu',
-                'setup_micro_adam/microadam_asymm_global_quant_inv.cu',
+                'kernels/cuda_daslab_tools/daslab_tools.cpp',
+                'kernels/cuda_daslab_tools/daslab_tools.cu',
             ]),
         CUDAExtension(
-            name=f'sparse_mfac_sm{cc[0]}{cc[1]}',
+            name=f'cuda_micro_adam_sm{cc[0]}{cc[1]}',
             sources=[
-                'setup_sparse_mfac/sparsemfac.cpp',
-                'setup_sparse_mfac/sparsemfac_SP_kernel.cu',
-                'setup_sparse_mfac/sparsemfac_LCG_kernel.cu',
-                'setup_sparse_mfac/utils.cu'
+                'kernels/cuda_micro_adam/microadam.cpp',
+                'kernels/cuda_micro_adam/microadam_update.cu',
+                'kernels/cuda_micro_adam/microadam_symm_block_quant.cu',
+                'kernels/cuda_micro_adam/microadam_symm_block_quant_inv.cu',
+                'kernels/cuda_micro_adam/microadam_asymm_block_quant.cu',
+                'kernels/cuda_micro_adam/microadam_asymm_block_quant_inv.cu',
+                'kernels/cuda_micro_adam/microadam_asymm_global_quant.cu',
+                'kernels/cuda_micro_adam/microadam_asymm_global_quant_inv.cu',
             ]),
+        CUDAExtension(
+            name=f'cuda_sparse_mfac_sm{cc[0]}{cc[1]}',
+            sources=[
+                'kernels/cuda_sparse_mfac/sparsemfac.cpp',
+                'kernels/cuda_sparse_mfac/sparsemfac_SP_kernel.cu',
+                'kernels/cuda_sparse_mfac/sparsemfac_LCG_kernel.cu',
+            ]),
+
 
     ],
     cmdclass={'build_ext': BuildExtension}
