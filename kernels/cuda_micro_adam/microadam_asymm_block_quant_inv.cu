@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../utils.h"
 
 __device__ LL minLL(LL a, LL b) {
     return (a < b) ? a : b;

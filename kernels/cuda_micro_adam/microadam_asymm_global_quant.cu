@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../utils.h"
 
 __global__ void asymm_global_quant_kernel(LL d, uint8_t *xq, float x_min, float x_max, float *x) {
 	/*

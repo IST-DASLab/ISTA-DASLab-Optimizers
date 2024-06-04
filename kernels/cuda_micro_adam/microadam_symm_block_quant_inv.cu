@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../utils.h"
 
 __global__ void symm_block_quant_inv_kernel(LL d, LL q_block_size, uint8_t *xq, bfloat16 *ranges, bfloat16 *x) {
 	/*

@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../utils.h"
 
 __device__ LL div_inc(LL a, LL b) {
 	LL r = a / b;
