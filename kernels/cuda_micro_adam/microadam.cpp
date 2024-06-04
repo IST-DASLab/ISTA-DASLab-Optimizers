@@ -18,9 +18,6 @@ void compute_cadam_update_cuda(int blocks, int threads, int carveout,
 						       LL d, LL m, LL k,
 						       torch::Tensor indices, torch::Tensor values, torch::Tensor out);
 
-void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices, LL d, LL k, LL d_block_size, LL k_block_size);
-void copy_values_at_relative_indices_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out);
-
 void asymm_global_quant_cuda(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x);
 void asymm_global_quant_inv_cuda(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x);
 
@@ -30,9 +27,6 @@ void symm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::T
 void asymm_block_quant_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
 void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
 
-int get_max_floats_for_shared_memory_per_thread_block_cuda();
-
-int get_sm_count_cuda();
 // C++ methods
 void compute_cadam_update(int blocks, int threads, int carveout,
 						  LL t, float beta1, float beta2, float eps,
@@ -51,23 +45,6 @@ void compute_cadam_update(int blocks, int threads, int carveout,
 							  d_block_size, k_block_size,
 							  d, m, k,
 							  indices, values, out);
-}
-
-void zerorize_block_components(torch::Tensor vector, torch::Tensor indices, LL d, LL k, LL d_block_size, LL k_block_size) {
-    CHECK_INPUT(vector);
-    CHECK_INPUT(indices);
-
-    const at::cuda::OptionalCUDAGuard device_guard(device_of(vector));
-    zerorize_block_components_cuda(vector, indices, d, k, d_block_size, k_block_size);
-}
-
-void copy_values_at_relative_indices(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
-    CHECK_INPUT(indices);
-    CHECK_INPUT(vector);
-    CHECK_INPUT(out);
-
-    const at::cuda::OptionalCUDAGuard device_guard(device_of(indices));
-    copy_values_at_relative_indices_cuda(d, k, d_block_size, k_block_size, indices, vector, out);
 }
 
 void asymm_global_quant(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x) {
@@ -136,9 +113,6 @@ int get_sm_count() {
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 	m.def("compute_cadam_update", &compute_cadam_update, "Computes the update from Compressed Adam.");
 
-	m.def("zerorize_block_components", &zerorize_block_components, "Zerorizes the components in blocks.");
-	m.def("copy_values_at_relative_indices", &copy_values_at_relative_indices, "Copy values from `vector` at `indices` to out.");
-
     m.def("asymm_global_quant", &asymm_global_quant, "Quantizes a vector to 4bits globally.");
     m.def("asymm_global_quant_inv", &asymm_global_quant_inv, "Dequantizes a vector to 4bits globally.");
 
@@ -147,8 +121,4 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
     m.def("asymm_block_quant", &asymm_block_quant, "Asymmetrically quantizes a vector to 4bits in blocks.");
     m.def("asymm_block_quant_inv", &asymm_block_quant_inv, "Asymmetrically dequantizes a vector to 4bits in blocks.");
-
-	m.def("get_max_floats_for_shared_memory_per_thread_block", &get_max_floats_for_shared_memory_per_thread_block,
-		  "Computes the maximum number of floats that can be stored in the shared memory per thread block");
-	m.def("get_sm_count", &get_sm_count, "Return number of SMs for the GPU");
 }

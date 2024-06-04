@@ -7,6 +7,7 @@ from torch.distributed import is_initialized, get_rank
 from ..tools import get_first_device, get_gpu_mem_usage, block_split, import_cuda_module
 
 cuda_micro_adam = import_cuda_module('cuda_micro_adam')
+cuda_daslab_tools = import_cuda_module('cuda_daslab_tools')
 
 class MicroAdam(torch.optim.Optimizer):
     def __init__(self, params, m, lr, quant_block_size, k_init=0.01, betas=(0.9, 0.999), weight_decay=0, eps=1e-8):
@@ -160,7 +161,7 @@ class MicroAdam(torch.optim.Optimizer):
                                             k=k_block_size_few,  # example: slice has size 1, but ks[-1] is 4
                                             sorted=False).indices.to(dtype=torch.int16).view(-1)
 
-        cuda_micro_adam.copy_values_large_to_small(d,
+        cuda_daslab_tools.copy_values_large_to_small(d,
                                                    k,
                                                    d_block_size,
                                                    k_block_size_many,
@@ -170,7 +171,7 @@ class MicroAdam(torch.optim.Optimizer):
         st['index'] = (index + 1) % self.m
 
         ##### STEP 6
-        cuda_micro_adam.zerorize_block_components(grad, I[index, :], d, k, d_block_size, k_block_size_many)  # this does a[I[index]] = 0
+        cuda_daslab_tools.zerorize_block_components(grad, I[index, :], d, k, d_block_size, k_block_size_many)  # this does a[I[index]] = 0
 
         ##### STEP 7
         if quant_full_blocks_count == 1:
