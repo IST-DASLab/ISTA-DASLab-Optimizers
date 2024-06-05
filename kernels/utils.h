@@ -19,11 +19,6 @@
 
 using namespace std;
 
-#define FLOAT_EPS std::numeric_limits<float>::epsilon()
-#define DOUBLE_EPS std::numeric_limits<double>::epsilon()
-#define GPU_ERROR_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-#define ASSERT_BF16(x) { assert(torch::ScalarType::BFloat16 == x.scalar_type()); }
-
 typedef __nv_bfloat16 bfloat16;
 typedef __nv_bfloat162 bfloat162;
 typedef short int int16;
@@ -45,26 +40,31 @@ inline void gpuAssert(cudaError_t code, const char *file, int line) {
     }
 }
 
-//__device__ long div_inc(long a, long b) {
-//	long r = a / b;
-//	return (a % b > 0) ? (r + 1) : r;
-//}
-//
-//__device__ LL minLL(LL a, LL b) {
-//    return (a < b) ? a : b;
-//}
-//
-//__host__ __device__ float my_pow(float base, int exp) { // log2 time
-//    float result = 1.;
-//    while(exp > 0) {
-//        if(exp & 1) {
-//            result *= base;
-//            --exp;
-//        }
-//        base = base * base;
-//        exp >>= 1;
-//    }
-//    return result;
-//}
+__device__ inline long div_inc(long a, long b) {
+	long r = a / b;
+	return (a % b > 0) ? (r + 1) : r;
+}
+
+__device__ inline LL minLL(LL a, LL b) {
+   return (a < b) ? a : b;
+}
+
+__host__ __device__ inline float my_pow(float base, int exp) { // log2 time
+   float result = 1.;
+   while(exp > 0) {
+       if(exp & 1) {
+           result *= base;
+           --exp;
+       }
+       base = base * base;
+       exp >>= 1;
+   }
+   return result;
+}
+
+#define FLOAT_EPS std::numeric_limits<float>::epsilon()
+#define DOUBLE_EPS std::numeric_limits<double>::epsilon()
+#define GPU_ERROR_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#define ASSERT_BF16(x) { assert(torch::ScalarType::BFloat16 == x.scalar_type()); }
 
 #endif
