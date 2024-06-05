@@ -11,10 +11,6 @@ cuda_daslab_tools = import_cuda_module('cuda_daslab_tools')
 
 USE_CUDA = True
 
-def div_inc(a, b):
-    r = a // b
-    return (r + 1) if (a % b > 0) else r
-
 class SparseCoreMFACwithEF:
     def __init__(self, m, d, k_init, dev, gpus, damp, use_bf16):
         if USE_CUDA and m % 32 != 0 or m > 1024:
