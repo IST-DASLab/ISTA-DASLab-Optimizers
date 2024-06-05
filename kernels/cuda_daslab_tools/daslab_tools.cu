@@ -70,27 +70,6 @@ __global__ void zerorize_block_components_kernel_bf16(bfloat16 *vector, int16 *i
         vector[indices[ki] + d_index_start] = zero;
     }
 }
-__global__ void zerorize_block_components_kernel_f32(float *vector, int16 *indices, LL d, LL k, LL d_block_size, LL k_block_size) {
-// 	const LL B = gridDim.x; // number of blocks
-	const LL Bid = blockIdx.x; // block id
-// 	const LL T = blockDim.x; // number of threads
-	const LL Tid = threadIdx.x; // thread id
-
-    LL d_index_start = Bid * d_block_size;
-//     LL d_index_end = min(d_index_start + d_block_size, d);
-
-    LL k_index_start = Bid * k_block_size;
-    LL k_index_end = min(k_index_start + k_block_size, k);
-
-    float zero = 0.0f;
-
-    LL ki = Tid + k_index_start;
-
-    if(ki < k_index_end) { // Tid is the index for indices
-        // to obtain the index to be used in vector, we have to add the block offset given by d_index_start
-        vector[indices[ki] + d_index_start] = zero;
-    }
-}
 void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices, LL d, LL k, LL d_block_size, LL k_block_size) {
     assert(k_block_size <= 1024);
     LL blocks = 1 + (LL)(k / k_block_size);
@@ -112,12 +91,8 @@ void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices,
                                                                       k_block_size);
             break;
         case torch::ScalarType::Float:
-            zerorize_block_components_kernel_f32<<<blocks, threads>>>((float*) vector.data_ptr(),
-                                                                      (int16*) indices.data_ptr(),
-                                                                      d,
-                                                                      k,
-                                                                      d_block_size,
-                                                                      k_block_size);
+            printf("zerorize_block_components was not implemented for float32!\n");
+            exit(666);
             break;
     }
     // error checks
@@ -150,38 +125,8 @@ __global__ void copy_values_large_to_small_kernel_bf16(LL d, LL k, LL d_block_si
 
     if(ki < k_index_end) { // Tid is the index for indices
         out[indices[ki] + d_index_start] = vector[ki];
-//         printf("Bid=%ld, Tid=%ld, d_index_start=%ld, k_index_start=%ld, k_index_end=%ld, i=%ld, pos=%ld\n",
-//             Bid, Tid, d_index_start, k_index_start, k_index_end, i, i + d_index_start);
     }
 }
-// __global__ void copy_values_large_to_small_kernel_f32(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, float *vector, bfloat16 *out) {
-//     /*
-//         This kernel performs the operation out = vector[indices], where `indices` contains int16 values representing the
-//     relative indices in each block of size d_block_size, having k_block_size (last block might be shorter).
-//         Dimensions:
-//         - indices: size k
-//         - vector: size d
-//         - out: size k
-//     */
-//     // const LL B = gridDim.x; // number of blocks
-// 	const LL Bid = blockIdx.x; // block id
-// // 	const LL T = blockDim.x; // number of threads
-// 	const LL Tid = threadIdx.x; // thread id
-//
-//     LL d_index_start = Bid * d_block_size;
-//     //LL d_index_end = min(d_index_start + d_block_size, d);
-//
-//     LL k_index_start = Bid * k_block_size;
-//     LL k_index_end = min(k_index_start + k_block_size, k);
-//
-//     LL ki = Tid + k_index_start;
-//
-//     if(ki < k_index_end) { // Tid is the index for indices
-//         out[indices[ki] + d_index_start] = __float2bfloat16(vector[ki]);
-// //         printf("Bid=%ld, Tid=%ld, d_index_start=%ld, k_index_start=%ld, k_index_end=%ld, i=%ld, pos=%ld\n",
-// //             Bid, Tid, d_index_start, k_index_start, k_index_end, i, i + d_index_start);
-//     }
-// }
 void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
     assert(k_block_size <= 1024);
     LL blocks = 1 + (LL)(k / k_block_size);
@@ -203,16 +148,8 @@ void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
                                                                             (bfloat16*) out.data_ptr());
             break;
         case torch::ScalarType::Float:
-
             printf("copy_values_large_to_small was not implemented for float32!\n");
             exit(666);
-//             copy_values_large_to_small_kernel_f32<<<blocks, threads>>>(d,
-//                                                                        k,
-//                                                                        d_block_size,
-//                                                                        k_block_size,
-//                                                                        (int16*) indices.data_ptr(),
-//                                                                        (float*) vector.data_ptr(),
-//                                                                        (bfloat16*) out.data_ptr());
             break;
     }
     // error checks
@@ -275,13 +212,6 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
         case torch::ScalarType::Float:
             printf("copy_values_small_to_large_cuda was not implemented for float32!\n");
             exit(666);
-//             copy_values_small_to_large_kernel_f32<<<blocks, threads>>>(d,
-//                                                                             k,
-//                                                                             d_block_size,
-//                                                                             k_block_size,
-//                                                                             (int16*) indices.data_ptr(),
-//                                                                             (float*) vector.data_ptr(),
-//                                                                             (bfloat16*) out.data_ptr());
             break;
     }
     // error checks
