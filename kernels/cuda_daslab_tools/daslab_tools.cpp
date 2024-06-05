@@ -7,9 +7,26 @@ typedef long long LL;
 // CUDA methods
 int get_max_floats_for_shared_memory_per_thread_block_cuda();
 int get_sm_count_cuda();
-void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices, LL d, LL k, LL d_block_size, LL k_block_size);
-void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out);
-void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out);
+void zerorize_block_components_cuda(torch::Tensor vector,
+                                    torch::Tensor indices,
+                                    LL d,
+                                    LL k,
+                                    LL d_block_size,
+                                    LL k_block_size);
+void copy_values_large_to_small_cuda(LL d,
+                                     LL k,
+                                     LL d_block_size,
+                                     LL k_block_size,
+                                     torch::Tensor indices,
+                                     torch::Tensor vector,
+                                     torch::Tensor out);
+void copy_values_small_to_large_cuda(LL d,
+                                     LL k,
+                                     LL d_block_size,
+                                     LL k_block_size,
+                                     torch::Tensor indices,
+                                     torch::Tensor vector,
+                                     torch::Tensor out);
 
 // C++ methods
 int get_max_floats_for_shared_memory_per_thread_block() {
@@ -20,7 +37,12 @@ int get_sm_count() {
 	return get_sm_count_cuda();
 }
 
-void zerorize_block_components(torch::Tensor vector, torch::Tensor indices, LL d, LL k, LL d_block_size, LL k_block_size) {
+void zerorize_block_components_cuda(torch::Tensor vector,
+                                    torch::Tensor indices,
+                                    LL d,
+                                    LL k,
+                                    LL d_block_size,
+                                    LL k_block_size) {
     CHECK_INPUT(vector);
     CHECK_INPUT(indices);
 
@@ -28,7 +50,13 @@ void zerorize_block_components(torch::Tensor vector, torch::Tensor indices, LL d
     zerorize_block_components_cuda(vector, indices, d, k, d_block_size, k_block_size);
 }
 
-void copy_values_large_to_small(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
+void void copy_values_large_to_small(LL d,
+                                          LL k,
+                                          LL d_block_size,
+                                          LL k_block_size,
+                                          torch::Tensor indices,
+                                          torch::Tensor vector,
+                                          torch::Tensor out) {
     CHECK_INPUT(indices);
     CHECK_INPUT(vector);
     CHECK_INPUT(out);
@@ -37,13 +65,19 @@ void copy_values_large_to_small(LL d, LL k, LL d_block_size, LL k_block_size, to
     copy_values_large_to_small_cuda(d, k, d_block_size, k_block_size, indices, vector, out);
 }
 
-void copy_values_small_to_large(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
+void copy_values_small_to_large(LL d,
+                                     LL k,
+                                     LL d_block_size,
+                                     LL k_block_size,
+                                     torch::Tensor indices,
+                                     torch::Tensor vector,
+                                     torch::Tensor out) {
     CHECK_INPUT(indices);
     CHECK_INPUT(vector);
     CHECK_INPUT(out);
 
     const at::cuda::OptionalCUDAGuard device_guard(device_of(indices));
-    copy_values_small_to_large(d, k, d_block_size, k_block_size, indices, vector, out);
+    copy_values_small_to_large_cuda(d, k, d_block_size, k_block_size, indices, vector, out);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
