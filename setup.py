@@ -33,14 +33,18 @@ setup(
                 'kernels/cuda_micro_adam/microadam_asymm_global_quant_inv.cu',
             ]),
         CUDAExtension(
+            name=f'cuda_dense_mfac_sm{cc[0]}{cc[1]}',
+            sources=[
+                'kernels/cuda_dense_mfac/densemfac.cpp',
+                'kernels/cuda_dense_mfac/densemfac_kernel.cu',
+            ]),
+        CUDAExtension(
             name=f'cuda_sparse_mfac_sm{cc[0]}{cc[1]}',
             sources=[
                 'kernels/cuda_sparse_mfac/sparsemfac.cpp',
                 'kernels/cuda_sparse_mfac/sparsemfac_SP_kernel.cu',
                 'kernels/cuda_sparse_mfac/sparsemfac_LCG_kernel.cu',
             ]),
-
-
     ],
     cmdclass={'build_ext': BuildExtension}
 )

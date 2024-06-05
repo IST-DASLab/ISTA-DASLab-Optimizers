@@ -11,14 +11,14 @@ import torch
 import gpustat
 import wandb
 
+from torch.utils.data import DataLoader
 from torch.nn.functional import cross_entropy
 from torchvision.models import resnet18
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from timm.optim.optim_factory import param_groups_weight_decay
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-from ista_daslab_optimizers import MicroAdam
+from ista_daslab_optimizers import MicroAdam, SparseMFAC, DenseMFAC
 
 def get_arg_parse():
     parser = argparse.ArgumentParser()
@@ -97,6 +97,21 @@ def get_optimizer(args, model):
             lr=args.lr,  # change accordingly
             quant_block_size=args.ef_quant_bucket_size,  # 32 or 64 also works
             k_init=args.k)  # float between 0 and 1 meaning percentage: 0.01 means 1%
+    if args.optimizer == 'sparse-mfac':
+        return SparseMFAC(
+            param_groups,
+            lr=args.lr,
+            m=args.m,
+            damp=args.damp,
+            k_init=args.k,
+            use_bf16=args.use_bf16)
+    if args.optimizer == 'dense-mfac':
+        return DenseMFAC(
+            param_groups,
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+            ngrads=args.m,
+            damp=args.damp)
     raise RuntimeError(f'Not sure how to build optimizer {args.optimizer_name}')
 
 def get_cifar10_datasets(data_dir):
