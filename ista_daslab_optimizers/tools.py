@@ -8,7 +8,7 @@ def get_cuda_capability(device=0):
     cc = torch.cuda.get_device_capability(device) # tuple, for example (8, 6) for CUDA Capability 8.6
     return f'{cc[0]}{cc[1]}'
 
-def import_cuda_module(name):
+def import_cuda_module(name, raise_error=True):
     """
     Import a CUDA module based on the name, assuming that the module was installed for a specific cuda capability.
     For example, if the package 'my_cuda' was installed for CUDA capability 8.0, then the imported module will be 'my_cuda_sm80'.
@@ -20,7 +20,8 @@ def import_cuda_module(name):
         module = import_module(f'{name}_sm{cc}')
         return module
     except ModuleNotFoundError as e:
-        raise RuntimeError(f'The library "{name}" was not compiled for sm{cc}!')
+        if raise_error:
+            raise RuntimeError(f'The library "{name}" was not compiled for sm{cc}!')
 
 ####################################################################################################
 ##### MODULE IMPORT HERE
