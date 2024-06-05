@@ -2,8 +2,13 @@
 This repository contains optimization algorithms for Deep Learning developed by 
 the Distributed Algorithms and Systems lab at Institute of Science and Technology Austria.
 
-## Current project status (as of May 27th, 2024)
-We are currently working on solving the issues with the installation via `pip`. 
+## Project status
+- **June 5th, 2024**:
+  - *DONE*: the project is locally installable via `pip install .` 
+  - *NEXT*:
+    - working on examples for Sparse M-FAC and Dense M-FAC
+- **May 27th, 2024**:
+  - we are currently working on solving the issues with the installation via `pip`. 
 
 ### Installation
 We provide a script `install.sh` that creates a new environment, installs requirements 
