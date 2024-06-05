@@ -189,21 +189,21 @@ class MicroAdam(torch.optim.Optimizer):
 
         ##### STEPS 10-11
         grad.zero_()
-        cuda_micro_adam.compute_cadam_update(blocks,  # blocks
-                                        self.threads,  # threads
-                                        self.shared_memory_carveout,  # carveout
-                                        self.steps,  # optimization step
-                                        self.beta1,  # beta1
-                                        self.beta2,  # beta2
-                                        self.eps,  # eps
-                                        d_block_size,  # d_block_size
-                                        k_block_size_many,  # k_block_size
-                                        d,  # d
-                                        self.m,  # m
-                                        k,  # k
-                                        I,  # indices
-                                        V,  # values
-                                        grad)  # update will be stored here
+        cuda_micro_adam.compute_microadam_update(blocks,  # blocks
+                                                 self.threads,  # threads
+                                                 self.shared_memory_carveout,  # carveout
+                                                 self.steps,  # optimization step
+                                                 self.beta1,  # beta1
+                                                 self.beta2,  # beta2
+                                                 self.eps,  # eps
+                                                 d_block_size,  # d_block_size
+                                                 k_block_size_many,  # k_block_size
+                                                 d,  # d
+                                                 self.m,  # m
+                                                 k,  # k
+                                                 I,  # indices
+                                                 V,  # values
+                                                 grad)  # update will be stored here
 
         ##### STEP 12
         p.mul_(1 - lr * wd).add_(p.grad, alpha=-lr)
