@@ -154,7 +154,7 @@ __global__ void copy_values_large_to_small_kernel_bf16(LL d, LL k, LL d_block_si
 //             Bid, Tid, d_index_start, k_index_start, k_index_end, i, i + d_index_start);
     }
 }
-__global__ void copy_values_large_to_small_kernel_f32(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, bfloat16 *vector, bfloat16 *out) {
+__global__ void copy_values_large_to_small_kernel_f32(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, float *vector, bfloat16 *out) {
     /*
         This kernel performs the operation out = vector[indices], where `indices` contains int16 values representing the
     relative indices in each block of size d_block_size, having k_block_size (last block might be shorter).
@@ -204,12 +204,12 @@ void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
             break;
         case torch::ScalarType::Float:
             copy_values_large_to_small_kernel_f32<<<blocks, threads>>>(d,
-                                                                            k,
-                                                                            d_block_size,
-                                                                            k_block_size,
-                                                                            (int16*) indices.data_ptr(),
-                                                                            (float*) vector.data_ptr(),
-                                                                            (bfloat16*) out.data_ptr());
+                                                                       k,
+                                                                       d_block_size,
+                                                                       k_block_size,
+                                                                       (int16*) indices.data_ptr(),
+                                                                       (float*) vector.data_ptr(),
+                                                                       (bfloat16*) out.data_ptr());
             break;
     }
     // error checks
@@ -246,7 +246,7 @@ __global__ void copy_values_small_to_large_kernel_bf16(LL d, LL k, LL d_block_si
     LL ki = Tid + k_index_start;
 
     if(ki < k_index_end) { // Tid is the index for indices
-        out[ki] = vector[indices[ki] + d_index_start]);
+        out[ki] = vector[indices[ki] + d_index_start];
     }
 }
 void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
@@ -271,7 +271,7 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
             break;
         case torch::ScalarType::Float:
             printf("copy_values_small_to_large_cuda was not implemented for float32!\n");
-            exit(666)
+            exit(666);
 //             copy_values_small_to_large_kernel_f32<<<blocks, threads>>>(d,
 //                                                                             k,
 //                                                                             d_block_size,

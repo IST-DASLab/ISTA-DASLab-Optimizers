@@ -50,13 +50,13 @@ __device__ long div_inc(long a, long b) {
 	return (a % b > 0) ? (r + 1) : r;
 }
 
-#define ALIGN_BYTES 8
-typedef __nv_bfloat16 bfloat16;
+//#define ALIGN_BYTES 8
+//typedef __nv_bfloat16 bfloat16;
 
 // 2 bytes = 16 bits for each bfloat16 => 8 bytes = 64 bits in total for the entire struct
 // aligning to 8 bytes means that we can read the entire struct in one 64 bit transaction
-typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y, z, w; } bfloat164; // chapter 10.27.6.1 from the CUDA Bible
-typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y; } bfloat162;
+//typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y, z, w; } bfloat164; // chapter 10.27.6.1 from the CUDA Bible
+//typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y; } bfloat162;
 //typedef struct __align__(ALIGN_BYTES) { float x, y; } float2;
 
 #endif
