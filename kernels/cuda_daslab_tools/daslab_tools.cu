@@ -1,30 +1,6 @@
-#include "../utils.h"
+#include "daslab_tools.h"
 
-__global__ void TestKernel(int n, int *v) {}
-
-int info_cuda(int numThreads, int sharedMemSize, bool verbose) {
-	int numBlocksPerSm = 0;
-	cudaDeviceProp deviceProp;
-	cudaGetDeviceProperties(&deviceProp, 0); // device 0
-	cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, (void*)TestKernel, numThreads, sharedMemSize);
-
-	if(verbose) {
-		cout << "Float epsilon: " << std::numeric_limits<float>::epsilon()
-			 << "\nDouble epsilon: " << std::numeric_limits<double>::epsilon()
-			 << "\n";
-		cout << "CUDA Device Properties:"
-			 << "\n\tmultiProcessorCount = " << deviceProp.multiProcessorCount
-			 << "\n\tnumBlocksPerSm = " << numBlocksPerSm
-			 << "\n\ttotal threads = " << numBlocksPerSm * deviceProp.multiProcessorCount * numThreads
-			 << "\n"
-			 << "\n\tsharedMemPerBlock = " << deviceProp.sharedMemPerBlock
-			 << "\n\tsharedMemPerMultiprocessor = " << deviceProp.sharedMemPerMultiprocessor
-			 << "\n\twarpSize = " << deviceProp.warpSize
-			 << "\n";
-	}
-
-	return numBlocksPerSm * deviceProp.multiProcessorCount;
-}
+__global__ void TestKernel(int n, int *v) { /* empty */}
 
 int get_max_floats_for_shared_memory_per_thread_block_cuda() {
 	cudaDeviceProp deviceProp;
@@ -49,7 +25,12 @@ int get_sm_count_cuda() {
 	return deviceProp.multiProcessorCount;
 }
 
-__global__ void zerorize_block_components_kernel_bf16(bfloat16 *vector, int16 *indices, LL d, LL k, LL d_block_size, LL k_block_size) {
+__global__ void zerorize_block_components_kernel_bf16(bfloat16 *vector,
+                                                      int16 *indices,
+                                                      LL d,
+                                                      LL k,
+                                                      LL d_block_size,
+                                                      LL k_block_size) {
 // 	const LL B = gridDim.x; // number of blocks
 	const LL Bid = blockIdx.x; // block id
 // 	const LL T = blockDim.x; // number of threads
@@ -101,7 +82,13 @@ void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices,
 // 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
 
-__global__ void copy_values_large_to_small_kernel_bf16(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, bfloat16 *vector, bfloat16 *out) {
+__global__ void copy_values_large_to_small_kernel_bf16(LL d,
+                                                       LL k,
+                                                       LL d_block_size,
+                                                       LL k_block_size,
+                                                       int16 *indices,
+                                                       bfloat16 *vector,
+                                                       bfloat16 *out) {
     /*
         This kernel performs the operation out = vector[indices], where `indices` contains int16 values representing the
     relative indices in each block of size d_block_size, having k_block_size (last block might be shorter).
@@ -128,6 +115,8 @@ __global__ void copy_values_large_to_small_kernel_bf16(LL d, LL k, LL d_block_si
     }
 }
 void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
+//     ASSERT_BF16(vector);
+//     ASSERT_BF16(out);
     assert(k_block_size <= 1024);
     LL blocks = 1 + (LL)(k / k_block_size);
 
@@ -158,7 +147,13 @@ void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
 // 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
 
-__global__ void copy_values_small_to_large_kernel_bf16(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, bfloat16 *vector,  bfloat16 *out) {
+__global__ void copy_values_small_to_large_kernel_bf16(LL d,
+                                                       LL k,
+                                                       LL d_block_size,
+                                                       LL k_block_size,
+                                                       int16 *indices,
+                                                       bfloat16 *vector,
+                                                       bfloat16 *out) {
     /*
         Explaining the kernel name:
         - the values from a vector of size k (small) (vector) will be copied to a vector of size d (large) (out)
@@ -210,7 +205,7 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
                                                                         (bfloat16*) out.data_ptr());
             break;
         case torch::ScalarType::Float:
-            printf("copy_values_small_to_large_cuda was not implemented for float32!\n");
+            printf("copy_values_small_to_large was not implemented for float32!\n");
             exit(666);
             break;
     }

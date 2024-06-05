@@ -18,7 +18,6 @@
 #include <limits> // for epsilon
 
 using namespace std;
-using namespace cooperative_groups;
 
 #define FLOAT_EPS std::numeric_limits<float>::epsilon()
 #define DOUBLE_EPS std::numeric_limits<double>::epsilon()
@@ -46,35 +45,26 @@ inline void gpuAssert(cudaError_t code, const char *file, int line) {
     }
 }
 
-__device__ long div_inc(long a, long b) {
-	long r = a / b;
-	return (a % b > 0) ? (r + 1) : r;
-}
-
-__device__ LL minLL(LL a, LL b) {
-    return (a < b) ? a : b;
-}
-
-__host__ __device__ float my_pow(float base, int exp) { // log2 time
-    float result = 1.;
-    while(exp > 0) {
-        if(exp & 1) {
-            result *= base;
-            --exp;
-        }
-        base = base * base;
-        exp >>= 1;
-    }
-    return result;
-}
-
-//#define ALIGN_BYTES 8
-//typedef __nv_bfloat16 bfloat16;
-
-// 2 bytes = 16 bits for each bfloat16 => 8 bytes = 64 bits in total for the entire struct
-// aligning to 8 bytes means that we can read the entire struct in one 64 bit transaction
-//typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y, z, w; } bfloat164; // chapter 10.27.6.1 from the CUDA Bible
-//typedef struct __align__(ALIGN_BYTES) { bfloat16 x, y; } bfloat162;
-//typedef struct __align__(ALIGN_BYTES) { float x, y; } float2;
+//__device__ long div_inc(long a, long b) {
+//	long r = a / b;
+//	return (a % b > 0) ? (r + 1) : r;
+//}
+//
+//__device__ LL minLL(LL a, LL b) {
+//    return (a < b) ? a : b;
+//}
+//
+//__host__ __device__ float my_pow(float base, int exp) { // log2 time
+//    float result = 1.;
+//    while(exp > 0) {
+//        if(exp & 1) {
+//            result *= base;
+//            --exp;
+//        }
+//        base = base * base;
+//        exp >>= 1;
+//    }
+//    return result;
+//}
 
 #endif
