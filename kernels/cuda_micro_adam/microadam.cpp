@@ -26,8 +26,7 @@ void compute_microadam_update(int blocks, int threads, int carveout,
 						  LL t, float beta1, float beta2, float eps,
 						  LL d_block_size, LL k_block_size,
 						  LL d, LL m, LL k,
-						  torch::Tensor indices, torch::Tensor values, torch::Tensor out)
-{
+						  torch::Tensor indices, torch::Tensor values, torch::Tensor out) {
 	CHECK_INPUT(indices);
 	CHECK_INPUT(values);
 	CHECK_INPUT(out);
@@ -39,40 +38,6 @@ void compute_microadam_update(int blocks, int threads, int carveout,
 							  d_block_size, k_block_size,
 							  d, m, k,
 							  indices, values, out);
-}
-
-void asymm_global_quant(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x) {
-	CHECK_INPUT(xq);
-	CHECK_INPUT(x);
-
-	const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
-	asymm_global_quant_cuda(blocks, threads, d, xq, x_min, x_max, x);
-}
-
-void asymm_global_quant_inv(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x) {
-	CHECK_INPUT(xq);
-	CHECK_INPUT(x);
-	
-	const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
-	asymm_global_quant_inv_cuda(blocks, threads, d, xq, x_min, x_max, x);
-}
-
-void symm_block_quant(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor ranges, torch::Tensor x) {
-	CHECK_INPUT(xq);
-	CHECK_INPUT(ranges);
-	CHECK_INPUT(x);
-
-	const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
-	symm_block_quant_cuda(d, q_block_size, xq, ranges, x);
-}
-
-void symm_block_quant_inv(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor ranges, torch::Tensor x) {
-	CHECK_INPUT(xq);
-	CHECK_INPUT(ranges);
-	CHECK_INPUT(x);
-
-	const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
-	symm_block_quant_inv_cuda(d, q_block_size, xq, ranges, x);
 }
 
 void asymm_block_quant(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x) {
