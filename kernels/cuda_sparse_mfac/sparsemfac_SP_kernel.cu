@@ -246,7 +246,7 @@ void SP_cuda(int blocks,
                                                    o_ptr);
 	}
 
-	gpuErrorCheck(cudaGetLastError());
-	gpuErrorCheck(cudaPeekAtLastError());
-	gpuErrorCheck(cudaDeviceSynchronize());
+	GPU_ERROR_CHECK(cudaGetLastError());
+	GPU_ERROR_CHECK(cudaPeekAtLastError());
+	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }

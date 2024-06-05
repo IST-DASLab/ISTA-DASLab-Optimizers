@@ -12,23 +12,17 @@ typedef long long LL;
 #define CHECK_THREADS(T) assert(T == 2 || T == 32 || T == 64 || T == 128 || T == 256 || T == 512 || T == 1024);
 
 // CUDA methods
-void compute_cadam_update_cuda(int blocks, int threads, int carveout,
+void compute_microadam_update_cuda(int blocks, int threads, int carveout,
 						  	   LL t, float beta1, float beta2, float eps,
 						  	   LL d_block_size, LL k_block_size,
 						       LL d, LL m, LL k,
 						       torch::Tensor indices, torch::Tensor values, torch::Tensor out);
 
-void asymm_global_quant_cuda(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x);
-void asymm_global_quant_inv_cuda(int blocks, int threads, LL d, torch::Tensor xq, float x_min, float x_max, torch::Tensor x);
-
-void symm_block_quant_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor ranges, torch::Tensor x);
-void symm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor ranges, torch::Tensor x);
-
 void asymm_block_quant_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
 void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
 
 // C++ methods
-void compute_cadam_update(int blocks, int threads, int carveout,
+void compute_microadam_update(int blocks, int threads, int carveout,
 						  LL t, float beta1, float beta2, float eps,
 						  LL d_block_size, LL k_block_size,
 						  LL d, LL m, LL k,
@@ -40,7 +34,7 @@ void compute_cadam_update(int blocks, int threads, int carveout,
 	CHECK_THREADS(threads);
 
   	const at::cuda::OptionalCUDAGuard device_guard(device_of(indices));
-	compute_cadam_update_cuda(blocks, threads, carveout,
+	compute_microadam_update_cuda(blocks, threads, carveout,
 							  t, beta1, beta2, eps,
 							  d_block_size, k_block_size,
 							  d, m, k,
@@ -81,7 +75,6 @@ void symm_block_quant_inv(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor
 	symm_block_quant_inv_cuda(d, q_block_size, xq, ranges, x);
 }
 
-
 void asymm_block_quant(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x) {
 	CHECK_INPUT(xq);
 	CHECK_INPUT(xmin);
@@ -102,22 +95,8 @@ void asymm_block_quant_inv(LL d, LL q_block_size, torch::Tensor xq, torch::Tenso
 	asymm_block_quant_inv_cuda(d, q_block_size, xq, xmin, xmax, x);
 }
 
-int get_max_floats_for_shared_memory_per_thread_block() {
-	return get_max_floats_for_shared_memory_per_thread_block_cuda();
-}
-
-int get_sm_count() {
-	return get_sm_count_cuda();
-}
-
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-	m.def("compute_cadam_update", &compute_cadam_update, "Computes the update from Compressed Adam.");
-
-    m.def("asymm_global_quant", &asymm_global_quant, "Quantizes a vector to 4bits globally.");
-    m.def("asymm_global_quant_inv", &asymm_global_quant_inv, "Dequantizes a vector to 4bits globally.");
-
-    m.def("symm_block_quant", &symm_block_quant, "Symmetrically quantizes a vector to 4bits in blocks.");
-    m.def("symm_block_quant_inv", &symm_block_quant_inv, "Symmetrically dequantizes a vector to 4bits in blocks.");
+	m.def("compute_microadam_update", &compute_microadam_update, "Computes the update from Compressed Adam.");
 
     m.def("asymm_block_quant", &asymm_block_quant, "Asymmetrically quantizes a vector to 4bits in blocks.");
     m.def("asymm_block_quant_inv", &asymm_block_quant_inv, "Asymmetrically dequantizes a vector to 4bits in blocks.");

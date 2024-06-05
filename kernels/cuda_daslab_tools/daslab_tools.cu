@@ -96,9 +96,9 @@ void zerorize_block_components_cuda(torch::Tensor vector, torch::Tensor indices,
             break;
     }
     // error checks
-	gpuErrorCheck(cudaGetLastError());
-	gpuErrorCheck(cudaPeekAtLastError());
-// 	gpuErrorCheck(cudaDeviceSynchronize());
+	GPU_ERROR_CHECK(cudaGetLastError());
+	GPU_ERROR_CHECK(cudaPeekAtLastError());
+// 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
 
 __global__ void copy_values_large_to_small_kernel_bf16(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, bfloat16 *vector, bfloat16 *out) {
@@ -153,9 +153,9 @@ void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
             break;
     }
     // error checks
-	gpuErrorCheck(cudaGetLastError());
-	gpuErrorCheck(cudaPeekAtLastError());
-// 	gpuErrorCheck(cudaDeviceSynchronize());
+	GPU_ERROR_CHECK(cudaGetLastError());
+	GPU_ERROR_CHECK(cudaPeekAtLastError());
+// 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
 
 __global__ void copy_values_small_to_large_kernel_bf16(LL d, LL k, LL d_block_size, LL k_block_size, int16 *indices, bfloat16 *vector,  bfloat16 *out) {
@@ -215,7 +215,7 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
             break;
     }
     // error checks
-	gpuErrorCheck(cudaGetLastError());
-	gpuErrorCheck(cudaPeekAtLastError());
-// 	gpuErrorCheck(cudaDeviceSynchronize());
+	GPU_ERROR_CHECK(cudaGetLastError());
+	GPU_ERROR_CHECK(cudaPeekAtLastError());
+// 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
