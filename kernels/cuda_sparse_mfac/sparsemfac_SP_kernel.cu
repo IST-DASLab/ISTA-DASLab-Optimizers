@@ -40,7 +40,8 @@ __device__ void parallel_reduce(float *mem, long T, long logT, long Tid, long of
 	}
 }
 
-__global__ void SP_v23(long m,
+__global__ void SP_v23(long d,
+                       long m,
                        long k,
                        long d_block_size,
                        long k_block_size,
@@ -126,7 +127,8 @@ __global__ void SP_v23(long m,
 
 __global__ void
 __launch_bounds__(1024) // 3 possible params, in this order: maxThreadsPerBlock, minBlocksPerMultiprocessor, maxBlocksPerCluster
-SP_v23_bf16(long m,
+SP_v23_bf16(long d,
+            long m,
             long k,
             long d_block_size,
             long k_block_size,
@@ -227,7 +229,8 @@ void SP_cuda(int blocks,
     long sharedMemSize = d_block_size * sizeof(float);
 
 	if (use_bf16 == 1) {
-        SP_v23_bf16<<<blocks, threads, sharedMemSize>>>(m,
+        SP_v23_bf16<<<blocks, threads, sharedMemSize>>>(d,
+                                                        m,
                                                         k,
                                                         d_block_size,
                                                         k_block_size,
@@ -236,7 +239,8 @@ void SP_cuda(int blocks,
                                                         (bfloat16*) values.data_ptr(),
                                                         o_ptr);
 	} else { // float values
-        SP_v23<<<blocks, threads, sharedMemSize>>>(m,
+        SP_v23<<<blocks, threads, sharedMemSize>>>(d,
+                                                   m,
                                                    k,
                                                    d_block_size,
                                                    k_block_size,

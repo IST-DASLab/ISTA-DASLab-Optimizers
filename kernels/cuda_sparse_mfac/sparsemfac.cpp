@@ -58,7 +58,7 @@ void SP(int blocks,
 	CHECK_THREADS(threads);
 
 	const at::cuda::OptionalCUDAGuard device_guard(device_of(g));
-	SP_cuda(blocks, threads, version, m, k, d_block_size, k_block_size, g, indices, values, out, use_bf16);
+	SP_cuda(blocks, threads, version, d, m, k, d_block_size, k_block_size, g, indices, values, out, use_bf16);
 }
 
 void LCG(int blocks,
