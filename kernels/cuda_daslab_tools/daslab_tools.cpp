@@ -37,7 +37,7 @@ int get_sm_count() {
 	return get_sm_count_cuda();
 }
 
-void zerorize_block_components_cuda(torch::Tensor vector,
+void zerorize_block_components(torch::Tensor vector,
                                     torch::Tensor indices,
                                     LL d,
                                     LL k,
