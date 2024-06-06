@@ -17,7 +17,8 @@ def import_cuda_module(name, raise_error=True):
     """
     try:
         cc = get_cuda_capability()
-        module = import_module(f'{name}_sm{cc}')
+        module = import_module(f'ista_daslab_optimizers.{name}_sm{cc}')
+        # module = import_module(f'{name}_sm{cc}')
         return module
     except ModuleNotFoundError as e:
         if raise_error:
