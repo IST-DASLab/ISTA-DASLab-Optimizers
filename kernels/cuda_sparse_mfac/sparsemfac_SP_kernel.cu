@@ -159,7 +159,6 @@ SP_v23_bf16(long d,
 	long blocks_count = div_inc(d, d_block_size);
 
 	double sum = 0.0f;
-	bfloat16 val;
 
 	/*
 	    Explanation for how we should compute an offset to be added to an int16 index:
