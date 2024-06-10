@@ -199,10 +199,10 @@ void LCG_cuda(int blocks,
                                                          k,
                                                          d_block_size,
                                                          k_block_size,
-                                                         c.data_ptr<float>(),
-                                                         indices.data_ptr<int16>(),
-                                                         values.data_ptr<bfloat16>(),
-                                                         out.data_ptr<float>());
+                                                         (float*) c.data_ptr(),
+                                                         (int16*) indices.data_ptr(),
+                                                         (bfloat16*) values.data_ptr(),
+                                                         (float*) out.data_ptr());
 	} else { // float values
         // see https://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf, chapter 19.7. Compute Capability 8.x and the example above it
         cudaFuncSetAttribute(LCG_v51, cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemSize);
@@ -211,10 +211,10 @@ void LCG_cuda(int blocks,
                                                     k,
                                                     d_block_size,
                                                     k_block_size,
-                                                    c.data_ptr<float>(),
-                                                    indices.data_ptr<int16>(),
-                                                    values.data_ptr<float>(),
-                                                    out.data_ptr<float>());
+                                                    (float*) c.data_ptr(),
+                                                    (int16*) indices.data_ptr(),
+                                                    (float*) values.data_ptr(),
+                                                    (float*) out.data_ptr());
 	}
 
 	GPU_ERROR_CHECK(cudaGetLastError());

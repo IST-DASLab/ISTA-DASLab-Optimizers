@@ -216,20 +216,20 @@ void SP_cuda(int blocks,
                                                         k,
                                                         d_block_size,
                                                         k_block_size,
-                                                        g.data_ptr<bfloat16>(),
-                                                        indices.data_ptr<int16>(),
-                                                        values.data_ptr<bfloat16>(),
-                                                        out.data_ptr<float>());
+                                                        (bfloat16*) g.data_ptr(),
+                                                        (int16*) indices.data_ptr(),
+                                                        (bfloat16*) values.data_ptr(),
+                                                        (float*) out.data_ptr());
 	} else { // float values
         SP_v23<<<blocks, threads, sharedMemSize>>>(d,
                                                    m,
                                                    k,
                                                    d_block_size,
                                                    k_block_size,
-                                                   g.data_ptr<float>(),
-                                                   indices.data_ptr<int16>(),
-                                                   values.data_ptr<float>(),
-                                                   out.data_ptr<float>());
+                                                   (float*) g.data_ptr(),
+                                                   (int16*) indices.data_ptr(),
+                                                   (float*) values.data_ptr(),
+                                                   (float*) out.data_ptr());
 	}
 
 	GPU_ERROR_CHECK(cudaGetLastError());
