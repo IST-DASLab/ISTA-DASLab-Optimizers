@@ -62,6 +62,24 @@ __host__ __device__ inline float my_pow(float base, int exp) { // log2 time
    return result;
 }
 
+__device__ inline long log_threads(long T) {
+	if(T == 2) return 1;
+	if(T == 4) return 2;
+	if(T == 8) return 3;
+	if(T == 16) return 4;
+	if(T == 32) return 5;
+	if(T == 64) return 6;
+	if(T == 128) return 7;
+	if(T == 256) return 8;
+	if(T == 512) return 9;
+	if(T == 1024) return 10;
+}
+
+#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
+#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
+#define CHECK_THREADS(T) assert(T == 2 || T == 32 || T == 64 || T == 128 || T == 256 || T == 512 || T == 1024);
+
 #define FLOAT_EPS std::numeric_limits<float>::epsilon()
 #define DOUBLE_EPS std::numeric_limits<double>::epsilon()
 #define GPU_ERROR_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
