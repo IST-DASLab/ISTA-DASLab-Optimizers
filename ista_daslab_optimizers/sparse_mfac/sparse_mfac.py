@@ -1,6 +1,6 @@
 import torch
 from .sparse_core_mfac_w_ef import SparseCoreMFACwithEF
-from ..tools import get_first_device, get_gpus, get_weights_and_gradients, update_model, get_cuda_capability
+from ..tools import get_first_device, get_gpus, get_weights_and_gradients, update_model
 
 class SparseMFAC(torch.optim.Optimizer):
     def __init__(self, params, lr: float, damp: float, m: int, k_init: float, weight_decay: float, use_bf16: bool):
@@ -30,7 +30,7 @@ class SparseMFAC(torch.optim.Optimizer):
         self.log_interval = 50
         self.grad_norms_sum = 0
 
-        self.wandb_data = dict(cuda_compute_capability=get_cuda_capability())
+        self.wandb_data = dict()
         self.cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
 
     @torch.no_grad()

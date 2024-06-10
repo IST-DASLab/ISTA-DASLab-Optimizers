@@ -1,13 +1,13 @@
 import math
 import torch
-from ..tools import import_cuda_module, block_split, KernelVersionsManager
+from ..tools import block_split, KernelVersionsManager
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-cuda_dense_mfac = import_cuda_module('cuda_dense_mfac')
-cuda_sparse_mfac = import_cuda_module('cuda_sparse_mfac')
-cuda_daslab_tools = import_cuda_module('cuda_daslab_tools')
+import ista_daslab_tools
+import ista_daslab_dense_mfac
+import ista_daslab_sparse_mfac
 
 USE_CUDA = True
 
@@ -28,25 +28,29 @@ class SparseCoreMFACwithEF:
         ##### Error Feedback & Top-K related methods
         self.error = torch.zeros(self.d, dtype=torch.bfloat16 if use_bf16 else torch.float32, device=self.device)
 
-        self.d_block_size = cuda_daslab_tools.get_max_floats_for_shared_memory_per_thread_block()
+        self.d_block_size = ista_daslab_tools.get_max_floats_for_shared_memory_per_thread_block()
         self.k_block_size = math.ceil(self.d_block_size * self.k_init)
         self.blocks_count, self.start_index_of_last_block = block_split(self.d, self.d_block_size)
-        self.k = math.ceil(self.k_block_size * self.k_init) * self.blocks_count
+        self.k = self.k_block_size * self.blocks_count
 
-        if self.start_index_of_last_block == 0:
-            self.last_k = 0
-        else:
+        self.last_k = 0
+        if self.start_index_of_last_block < self.d:
             last_block_size = self.d - self.start_index_of_last_block
             self.last_k = math.ceil(last_block_size * self.k_init)
             self.k += self.last_k
             print(f'Last block has size {last_block_size} and associated k for it is {self.last_k}')
+
+        print(f'{self.d=}, {self.k=}')
+        print(f'{self.d_block_size=}, {self.k_block_size=}')
+        print(f'{self.blocks_count=}, {self.start_index_of_last_block=}')
+        print(f'{self.last_k=}')
 
         self.log_interval = 0
         self.steps = 0
         self.wandb_data = dict()
 
         self.gpus_count = len(self.gpus)
-        self.dtype_indices = torch.uint16
+        self.dtype_indices = torch.int16
         self.dtype_values = torch.bfloat16 if use_bf16 else torch.float
 
         self.scalar_products = torch.zeros(self.m, dtype=torch.float, device=self.device)
@@ -73,7 +77,7 @@ class SparseCoreMFACwithEF:
 
         if USE_CUDA:
             diag_lambd = torch.diag(torch.full([self.m], self.lamda, device=self.device, dtype=self.dtype))
-            self.coef = cuda_dense_mfac.hinv_setup(tmp, diag_lambd)
+            self.coef = ista_daslab_dense_mfac.hinv_setup(tmp, diag_lambd)
         else:
             for i in range(max(self.buffer_index, 1), self.m):
                 self.coef[i, :i] = tmp[i, :i].matmul(self.coef[:i, :i])
@@ -84,20 +88,20 @@ class SparseCoreMFACwithEF:
         """
         self.error.add_(g) # the error feedback is the accumulator here
 
-        self.I[self.buffer_index, :self.start_index_of_last_block] = torch.topk(
+        self.I[self.buffer_index, :self.k-self.last_k] = torch.topk(
             input=self.error[0:self.start_index_of_last_block].abs().view(self.blocks_count, self.d_block_size),
             k=self.k_block_size, # k is the same for all first n-1 blocks
-            sorted=False).indices # will have 2D shape: (blocks_count, self.block_size)
+            sorted=False).indices.to(torch.int16).view(-1) # will have 2D shape: (blocks_count, self.block_size)
 
         if self.start_index_of_last_block < self.d:
-            self.I[self.buffer_index, :self.start_index_of_last_block] = torch.topk(
+            self.I[self.buffer_index, self.k-self.last_k:] = torch.topk(
                 input=self.error[self.start_index_of_last_block:].abs(),
                 k=self.last_k,
-                sorted=False).indices
+                sorted=False).indices.to(torch.int16)
 
         # copy the values from the error feedback accumulator to values V (this is the G update), e.g. V[index,:] = error[I[index, :]]
         # the large tensor (error, size d) is copied to the small tensor (V, size k)
-        cuda_daslab_tools.copy_values_large_to_small(self.d,
+        ista_daslab_tools.copy_values_large_to_small(self.d,
                                                      self.k,
                                                      self.d_block_size,
                                                      self.k_block_size,
@@ -107,7 +111,7 @@ class SparseCoreMFACwithEF:
 
         # the small tensor (V, size k) is copied to the large tensor (g, size d)
         g.zero_() # this will contain the values in V, at the right indices, but will also contain zeros
-        cuda_daslab_tools.copy_values_small_to_large(self.d, # this does out[I[index]] = vector
+        ista_daslab_tools.copy_values_small_to_large(self.d, # this does out[I[index]] = vector
                                                      self.k,
                                                      self.d_block_size,
                                                      self.k_block_size,
@@ -154,7 +158,7 @@ class SparseCoreMFACwithEF:
             dots = self.compute_scalar_products(g)
         giHix = self.lamda * dots
         if USE_CUDA:
-            giHix = cuda_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
+            giHix = ista_daslab_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
             torch.cuda.synchronize()
         else:
             for i in range(1, self.m):
@@ -170,40 +174,40 @@ class SparseCoreMFACwithEF:
     def compute_scalar_products(self, g):
         self.scalar_products.zero_()
 
-        cuda_sparse_mfac.SP(
+        ista_daslab_sparse_mfac.SP(
             self.kvm.get_SP_blocks(),
             self.kvm.get_SP_threads(),
             self.kvm.version_SP,
             self.d,
             min(self.m, self.steps),
             self.k,
+            self.d_block_size,
+            self.k_block_size,
             g,
             self.I,
             self.V,
             self.scalar_products,
-            int(self.use_bf16),
-            self.d_block_size,
-            self.k_block_size)
+            int(self.use_bf16))
 
         return self.scalar_products
 
     def compute_linear_combination(self, M, out):
         out.zero_()
 
-        cuda_sparse_mfac.LCG(
+        ista_daslab_sparse_mfac.LCG(
             self.kvm.get_LCG_blocks(),
             self.kvm.get_LCG_threads(),
             self.kvm.version_LCG,
             self.d,
             min(self.m, self.steps),
             self.k,
+            self.d_block_size,
+            self.k_block_size,
             M,
             self.I,
             self.V,
             out,
-            int(self.use_bf16),
-            self.d_block_size,
-            self.k_block_size)
+            int(self.use_bf16))
 
         if self.steps > 0 and self.log_interval > 0 and self.steps % self.log_interval == 0:
             self.wandb_data.update(dict(lin_comb_coef_norm=M.norm(p=2)))

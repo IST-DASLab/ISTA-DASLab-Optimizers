@@ -3,34 +3,12 @@ import gpustat
 import torch
 from enum import Enum
 from importlib import import_module
+import ista_daslab_tools
 
 def get_cuda_capability(device=0):
     cc = torch.cuda.get_device_capability(device) # tuple, for example (8, 6) for CUDA Capability 8.6
     return f'{cc[0]}{cc[1]}'
 
-def import_cuda_module(name, raise_error=True):
-    """
-    Import a CUDA module based on the name, assuming that the module was installed for a specific cuda capability.
-    For example, if the package 'my_cuda' was installed for CUDA capability 8.0, then the imported module will be 'my_cuda_sm80'.
-    :param name: the module to be imported
-    :return:
-    """
-    try:
-        cc = get_cuda_capability()
-        module = import_module(f'ista_daslab_optimizers.{name}_sm{cc}')
-        # module = import_module(f'{name}_sm{cc}')
-        return module
-    except ModuleNotFoundError as e:
-        if raise_error:
-            raise RuntimeError(f'The library "{name}" was not compiled for sm{cc}!')
-
-####################################################################################################
-##### MODULE IMPORT HERE
-####################################################################################################
-
-cuda_daslab_tools = import_cuda_module('cuda_daslab_tools')
-
-####################################################################################################
 class Strategy(Enum):
     """Apply Top-K globally"""
     GLOBAL = 1
@@ -212,7 +190,7 @@ class KernelVersionsManager:
 
         if op_blocks_threads[op_version][self.BLOCK_INDEX] is None:
             blocks_count = div_inc(self.d, self.d_block_size)
-            op_max_blocks = cuda_daslab_tools.get_sm_count()
+            op_max_blocks = ista_daslab_tools.get_sm_count()
             op_required_blocks = min(blocks_count, op_max_blocks)
             if op_required_blocks < op_max_blocks:
                 print(f'Maximum number of blocks for {op} is {op_max_blocks}, but this model requires only {op_required_blocks}')
