@@ -46,6 +46,7 @@ def get_arg_parse():
     parser.add_argument('--epochs', type=int, required=True, help='The number of epochs to train the model for')
     parser.add_argument('--batch_size', type=int, required=True, help='Batchsize to use for training.')
     parser.add_argument('--lr', type=float, default=1e-3, required=True, help='Learning rate to use for training.')
+    parser.add_argument('--damp', type=float, default=1e-6, required=False, help='Dampening for Sparse M-FAC')
     parser.add_argument('--momentum', type=float, default=0.9, help='Momentum to use for training.')
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay to use for training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
@@ -101,10 +102,11 @@ def get_optimizer(args, model):
         return SparseMFAC(
             param_groups,
             lr=args.lr,
+	        weight_decay=args.weight_decay,
             m=args.m,
             damp=args.damp,
             k_init=args.k,
-            use_bf16=args.use_bf16)
+            use_bf16=(args.precision == 'bf16'))
     if args.optimizer == 'dense-mfac':
         return DenseMFAC(
             param_groups,
