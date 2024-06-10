@@ -180,12 +180,20 @@ SP_v23_bf16(long d,
 	        offset = topk_block_id * d_block_size
 	*/
 	long offset;
-
+	int16 ind;
+	for(i = row_start + Tid; i < row_end; i += T) { // start from Tid and increase with T because we have T threads per block
+        offset = ((i - row_start) / k_block_size) * d_block_size;
+        ind = indices[i];
+        if(ind + offset < d) {
+		    sum += (__bfloat162float(values[i]) * __bfloat162float(g[ind + offset]));
+		}
+	}
+	/*
 	for(i = row_start + Tid; i < row_end; i += T) { // start from Tid and increase with T because we have T threads per block
         offset = ((i - row_start) / k_block_size) * d_block_size;
 		sum += (__bfloat162float(values[i]) * __bfloat162float(g[indices[i] + offset]));
 	}
-
+    */
 	mem[Tid] = sum;
 
 	parallel_reduce(mem, T, logT, Tid, 0, false);
@@ -208,9 +216,13 @@ void SP_cuda(int blocks,
 			 torch::Tensor out,
 			 int use_bf16) {
 	assert(version == 23);
-    long sharedMemSize = d_block_size * sizeof(float);
+    long sharedMemSize = threads * sizeof(float);
+
+//     printf("[KERNEL use_bf16=%d] sharedMemSize=%ld, d=%ld, m=%ld, k=%ld, d_block_size=%ld, k_block_size=%ld\n",
+//         use_bf16, sharedMemSize, d, m, k, d_block_size, k_block_size);
 
 	if (use_bf16 == 1) {
+// 	    printf("[KERNEL] using SP_v23_bf16\n");
         SP_v23_bf16<<<blocks, threads, sharedMemSize>>>(d,
                                                         m,
                                                         k,
@@ -221,6 +233,7 @@ void SP_cuda(int blocks,
                                                         (bfloat16*) values.data_ptr(),
                                                         (float*) out.data_ptr());
 	} else { // float values
+// 	    printf("[KERNEL] using SP_v23\n");
         SP_v23<<<blocks, threads, sharedMemSize>>>(d,
                                                    m,
                                                    k,

@@ -186,8 +186,6 @@ class KernelVersionsManager:
             r = a // b
             return (r + 1) if (a % b > 0) else r
 
-        print(f'{op_blocks_threads=}, {op_version=}, {op=}, {op_blocks_threads[op_version][self.BLOCK_INDEX]=}')
-
         if op_blocks_threads[op_version][self.BLOCK_INDEX] is None:
             blocks_count = div_inc(self.d, self.d_block_size)
             op_max_blocks = ista_daslab_tools.get_sm_count()
@@ -197,8 +195,8 @@ class KernelVersionsManager:
                 # return op_required_blocks
                 op_blocks_threads[op_version][self.BLOCK_INDEX] = op_required_blocks
             op_blocks_threads[op_version][self.BLOCK_INDEX] = op_max_blocks
-            # return op_max_blocks
-        # return op_blocks_threads[op_version][self.BLOCK_INDEX]
+
+        print(f'{op_blocks_threads=}, {op_version=}, {op=}, {op_blocks_threads[op_version][self.BLOCK_INDEX]=}')
 
     def get_SP_blocks(self):
         return self.SP_BLOCKS_THREADS[self.version_SP][self.BLOCK_INDEX]

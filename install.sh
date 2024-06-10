@@ -1,16 +1,15 @@
-ENV_NAME=ista_daslab_optimizers
+ENV_NAME=ista_from_scratch
 
-echo ">>>>> Loading CUDA 12.2 module"
-module load cuda/12.2
+#echo ">>>>> Loading CUDA 12.2 module"
+#module load cuda/12.2
 
 echo ">>>>> Creating environment \"${ENV_NAME}\""
 conda create --name $ENV_NAME python=3.8 -y
-
-echo ">>>>> Activating environment"
 conda activate $ENV_NAME
 
-echo ">>>>> Installing packages..."
-pip3 install wheel build torch torchvision torchaudio wandb gpustat timm
+echo ">>>>> Installing required packages..."
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip3 install wandb gpustat timm
 
-echo ">>>>> Installing packages..."
+echo ">>>>> Installing ISTA-DASLab-Optimizers..."
 pip3 install .

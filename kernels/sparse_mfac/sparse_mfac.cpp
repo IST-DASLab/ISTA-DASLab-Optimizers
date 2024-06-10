@@ -75,7 +75,7 @@ void LCG(int blocks,
 	CHECK_THREADS(threads);
 
   	const at::cuda::OptionalCUDAGuard device_guard(device_of(c));
-	LCG_cuda(blocks, threads, version, d_block_size, k_block_size, d, m, k, c, indices, values, out, use_bf16);
+	LCG_cuda(blocks, threads, version, d, m, k, d_block_size, k_block_size, c, indices, values, out, use_bf16);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

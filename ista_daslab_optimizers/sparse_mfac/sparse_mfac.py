@@ -21,7 +21,7 @@ class SparseMFAC(torch.optim.Optimizer):
             d=self.d,
             k_init=self.k_init,
             dev=self.device,
-            gpus=[device] if torch.distributed.is_initialized() else get_gpus(),
+            gpus=[self.device] if torch.distributed.is_initialized() else get_gpus(),
             damp=damp,
             use_bf16=use_bf16)
 
