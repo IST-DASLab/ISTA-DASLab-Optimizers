@@ -10,8 +10,8 @@ def get_cuda_capability(device=0):
     return f'{cc[0]}{cc[1]}'
 
 class CopyDirection(Enum):
-    COPY_DIRECTION_k2d = 0
-    COPY_DIRECTION_d2k = 1
+    k2d = 0
+    d2k = 1
 
 class Strategy(Enum):
     """Apply Top-K globally"""
