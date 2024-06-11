@@ -33,6 +33,15 @@ void copy_values_small_to_large_cuda(LL d,
                                      torch::Tensor vector,
                                      torch::Tensor out);
 
+void copy_values_cuda(LL d,
+                      LL k,
+                      LL d_block_size,
+                      LL k_block_size,
+                      torch::Tensor indices,
+                      torch::Tensor inp,
+                      torch::Tensor out,
+                      int direction);
+
 // C++ methods
 int get_max_floats_for_shared_memory_per_thread_block() {
 	return get_max_floats_for_shared_memory_per_thread_block_cuda();
@@ -85,6 +94,25 @@ void copy_values_small_to_large(LL d,
     copy_values_small_to_large_cuda(d, k, d_block_size, k_block_size, indices, vector, out);
 }
 
+void copy_values(LL d,
+                 LL k,
+                 LL d_block_size,
+                 LL k_block_size,
+                 torch::Tensor indices,
+                 torch::Tensor inp,
+                 torch::Tensor out,
+                 int direction) {
+    assert(direction == COPY_DIRECTION_k2d || direction == COPY_DIRECTION_d2k);
+
+    CHECK_INPUT(indices);
+    CHECK_INPUT(inp);
+    CHECK_INPUT(out);
+
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(indices));
+    copy_values_cuda(d, k, d_block_size, k_block_size, indices, inp, out, direction);
+}
+
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 	m.def("get_max_floats_for_shared_memory_per_thread_block", &get_max_floats_for_shared_memory_per_thread_block,
 		  "Computes the maximum number of floats that can be stored in the shared memory per thread block");
@@ -92,4 +120,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 	m.def("zerorize_block_components", &zerorize_block_components, "Zerorizes the components in blocks.");
 	m.def("copy_values_large_to_small", &copy_values_large_to_small, "Copy values from `vector` at `indices` to out.");
 	m.def("copy_values_small_to_large", &copy_values_small_to_large, "Copy values from `vector` at `indices` to out.");
+	m.def("copy_values", &copy_values, "Copy values from input to output");
 }

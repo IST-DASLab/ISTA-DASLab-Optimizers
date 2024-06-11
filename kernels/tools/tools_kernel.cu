@@ -111,7 +111,7 @@ __global__ void copy_values_large_to_small_kernel_bf16(LL d,
     LL ki = Tid + k_index_start;
 
     if(ki < k_index_end) { // Tid is the index for indices
-        out[indices[ki] + d_index_start] = vector[ki];
+        out[indices[ki] + d_index_start] = vector[ki]; // V[index,:] = error[I[index, :]]
     }
 }
 void copy_values_large_to_small_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
@@ -181,7 +181,7 @@ __global__ void copy_values_small_to_large_kernel_bf16(LL d,
     LL ki = Tid + k_index_start;
 
     if(ki < k_index_end) { // Tid is the index for indices
-        out[ki] = vector[indices[ki] + d_index_start];
+        out[ki] = vector[indices[ki] + d_index_start]; // out[I[index]] = vector
     }
 }
 void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_size, torch::Tensor indices, torch::Tensor vector, torch::Tensor out) {
@@ -206,6 +206,71 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
             break;
         case torch::ScalarType::Float:
             printf("copy_values_small_to_large was not implemented for float32!\n");
+            exit(666);
+            break;
+    }
+    // error checks
+	GPU_ERROR_CHECK(cudaGetLastError());
+	GPU_ERROR_CHECK(cudaPeekAtLastError());
+// 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
+}
+
+__global__ void copy_values_kernel_bf16<<<blocks, threads>>>(d,
+                                                             k,
+                                                             d_block_size,
+                                                             k_block_size,
+                                                             int16* indices,
+                                                             bfloat16* inp,
+                                                             bfloat16* out,
+                                                             int direction) {
+    /*
+        direction == COPY_DIRECTION_k2d: input is k-dim and output is d-dim
+        direction == COPY_DIRECTION_d2k: input is d-dim and output is k-dim
+    */
+	const LL Bid = blockIdx.x; // block id
+	const LL Tid = threadIdx.x; // thread id
+
+    LL k_index_start = Bid * k_block_size;
+    LL k_index_end = min(k_index_start + k_block_size, k);
+    LL ki = k_index_start + Tid;
+    // we create the number of threads based on k_block_size and we have to test if thread index (ki) is not outside of the bounds
+    if(ki < k_index_end) { // Tid is the index for indices
+        LL d_index_start = Bid * d_block_size;
+        LL di = d_index_start + indices[ki];
+        LL inp_index = (direction == COPY_DIRECTION_k2d) ? ki : di;
+        LL out_index = (direction == COPY_DIRECTION_k2d) ? di : ki;
+        out[out_index] = inp[inp_index];
+    }
+}
+void copy_values_cuda(LL d,
+                      LL k,
+                      LL d_block_size,
+                      LL k_block_size,
+                      torch::Tensor indices,
+                      torch::Tensor inp,
+                      torch::Tensor out,
+                      int direction) {
+    assert(k_block_size <= 1024);
+    LL blocks = 1 + (LL)(k / k_block_size);
+
+    // determine the number of threads as the first power of 2 larger than or equal to k_block_size
+    LL threads = 1;
+    while(threads < k_block_size) {
+        threads <<= 1;
+    }
+
+    switch(vector.scalar_type()) {
+        case torch::ScalarType::BFloat16:
+            copy_values_kernel_bf16<<<blocks, threads>>>(d,
+                                                         k,
+                                                         d_block_size,
+                                                         k_block_size,
+                                                         (int16*) indices.data_ptr(),
+                                                         (bfloat16*) inp.data_ptr(),
+                                                         (bfloat16*) out.data_ptr());
+            break;
+        case torch::ScalarType::Float:
+            printf("copy_values was not implemented for float32!\n");
             exit(666);
             break;
     }
