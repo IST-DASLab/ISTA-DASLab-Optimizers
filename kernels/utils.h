@@ -85,4 +85,7 @@ __device__ inline long log_threads(long T) {
 #define GPU_ERROR_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 #define ASSERT_BF16(x) { assert(torch::ScalarType::BFloat16 == x.scalar_type()); }
 
+#define COPY_DIRECTION_k2d 0
+#define COPY_DIRECTION_d2k 1
+
 #endif

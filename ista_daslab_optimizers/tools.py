@@ -9,6 +9,10 @@ def get_cuda_capability(device=0):
     cc = torch.cuda.get_device_capability(device) # tuple, for example (8, 6) for CUDA Capability 8.6
     return f'{cc[0]}{cc[1]}'
 
+class CopyDirection(Enum):
+    COPY_DIRECTION_k2d = 0
+    COPY_DIRECTION_d2k = 1
+
 class Strategy(Enum):
     """Apply Top-K globally"""
     GLOBAL = 1
