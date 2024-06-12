@@ -2,16 +2,18 @@ from setuptools import setup, find_packages
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
 setup(
-    name='ista_daslab_optimizers',
-    version='0.0.1',
-    author='Ionut-Vlad Modoranu',
-    author_email='ionut-vlad.modoranu@ist.ac.at',
-    description='Deep Learning optimizers developed in the Distributed Algorithms and Systems group (DASLab) @ Institute of Science and Technology Austria (ISTA)',
-    url='https://github.com/IST-DASLab/ISTA-DASLab-Optimizers',
-    
-    packages=find_packages(),
-    cmdclass={'build_ext': BuildExtension},
-
+    packages=find_packages(exclude=['examples']),
+    install_requires=[
+        "torch>=2.3.1",
+        "torchaudio>=2.3.1",
+        "torchvision>=0.18.1",
+        "numpy>=1.24.1",
+        "wandb>=0.17.1",
+        "gpustat>=1.1.1",
+        "timm>=1.0.3",
+        "einops>=0.8.0",
+        "psutil>=5.9.8",
+    ],
     ext_modules=[
         CUDAExtension(
             name=f'ista_daslab_tools',
@@ -40,4 +42,6 @@ setup(
                 'kernels/micro_adam/micro_adam_asymm_block_quant.cu',
                 'kernels/micro_adam/micro_adam_asymm_block_quant_inv.cu',
             ]),
-    ])
+    ],
+    cmdclass={'build_ext': BuildExtension},
+)
