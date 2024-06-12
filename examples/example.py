@@ -53,7 +53,7 @@ def get_arg_parse():
     parser.add_argument('--m', type=int, required=True, help='Window size for micro-adam, sparse-mfac')
     parser.add_argument('--k', type=float, required=True, help='Gradient density for micro-adam, sparse-mfac')
     parser.add_argument('--ef_quant_bucket_size', type=int, default=0, help='Bucket size used for EF quantization')
-    parser.add_argument('--precision', type=str, default='bf16', help='Data type to convert the model to')
+    parser.add_argument('--precision', type=str, default='bf16', choices=['bf16', 'f32'], help='Data type to convert the model to')
 
     return parser.parse_args()
 
