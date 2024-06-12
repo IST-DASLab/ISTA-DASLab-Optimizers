@@ -10,6 +10,7 @@ import random
 import torch
 import gpustat
 import wandb
+from custom_models import *
 
 from torch.utils.data import DataLoader
 from torch.nn.functional import cross_entropy
@@ -30,7 +31,12 @@ def get_arg_parse():
     parser.add_argument('--model',
                         type=str,
                         required=True,
-                        choices=['rn18'],
+                        choices=[
+                            'lenet-cifar', 'lenet-mnist',
+                            'rn18', 'rn20', 'rn32', 'rn44', 'rn56',
+                            'mobilenet',
+                            'vit-s', 'vit-t',
+                        ],
                         help='Model to train')
     parser.add_argument('--dataset_path', type=str, required=True, help='Path to dataset to use for training.')
     parser.add_argument('--dataset_name',
@@ -51,7 +57,7 @@ def get_arg_parse():
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay to use for training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     parser.add_argument('--m', type=int, required=True, help='Window size for micro-adam, sparse-mfac')
-    parser.add_argument('--k', type=float, required=True, help='Gradient density for micro-adam, sparse-mfac')
+    parser.add_argument('--k', type=float, required=False, help='Gradient density for micro-adam, sparse-mfac')
     parser.add_argument('--ef_quant_bucket_size', type=int, default=0, help='Bucket size used for EF quantization')
     parser.add_argument('--precision', type=str, default='f32', choices=['bf16', 'f32'], help='Data type to convert the model to')
 
@@ -73,12 +79,16 @@ def set_all_seeds(seed):
 
 def get_model(model_name, dataset_name, precision):
     num_classes = dict(cifar10=10)[dataset_name]
-    model = None
-    if model_name == 'rn18':
-        model = resnet18(pretrained=False, num_classes=num_classes)
 
-    if model is None:
-        raise RuntimeError(f'Note sure how to build model {model_name}')
+    if model_name == 'rn18': model = resnet18(pretrained=False, num_classes=num_classes)
+    if model_name == 'rn20': model = resnet20(num_classes=num_classes)
+    if model_name == 'rn32': model = resnet32(num_classes=num_classes)
+    if model_name == 'rn44': model = resnet44(num_classes=num_classes)
+    if model_name == 'rn56': model = resnet56(num_classes=num_classes)
+    if 'vit' in model_name: model = vit_cifar(model_name)
+    if model_name == 'mobilenet': model = mobilenet()
+    if model_name == 'lenet-cifar': model = LeNet5_CIFAR(num_classes=num_classes)
+    if model_name == 'lenet-mnist': model = LeNet5_MNIST(num_classes=num_classes)
 
     if precision in ['bf16', 'bfloat16']:
         model = model.to(dtype=torch.bfloat16)
