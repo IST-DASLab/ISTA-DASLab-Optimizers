@@ -215,14 +215,43 @@ void copy_values_small_to_large_cuda(LL d, LL k, LL d_block_size, LL k_block_siz
 // 	GPU_ERROR_CHECK(cudaDeviceSynchronize());
 }
 
-__global__ void copy_values_kernel_bf16<<<blocks, threads>>>(d,
-                                                             k,
-                                                             d_block_size,
-                                                             k_block_size,
-                                                             int16* indices,
-                                                             bfloat16* inp,
-                                                             bfloat16* out,
-                                                             int direction) {
+// __global__ void copy_values_kernel_inp_bf16_out_bf16(LL d,
+//                                                      LL k,
+//                                                      LL d_block_size,
+//                                                      LL k_block_size,
+//                                                      int16* indices,
+//                                                      bfloat16* inp,
+//                                                      bfloat16* out,
+//                                                      int direction) {
+//     /*
+//         direction == COPY_DIRECTION_k2d: input is k-dim and output is d-dim
+//         direction == COPY_DIRECTION_d2k: input is d-dim and output is k-dim
+//     */
+// 	const LL Bid = blockIdx.x; // block id
+// 	const LL Tid = threadIdx.x; // thread id
+//
+//     LL k_index_start = Bid * k_block_size;
+//     LL k_index_end = min(k_index_start + k_block_size, k);
+//     LL ki = k_index_start + Tid;
+//     // we create the number of threads based on k_block_size and we have to test if thread index (ki) is not outside of the bounds
+//     if(ki < k_index_end) { // Tid is the index for indices
+//         LL d_index_start = Bid * d_block_size;
+//         LL di = d_index_start + indices[ki];
+//         LL inp_index = (direction == COPY_DIRECTION_k2d) ? ki : di;
+//         LL out_index = (direction == COPY_DIRECTION_k2d) ? di : ki;
+//         out[out_index] = inp[inp_index];
+//     }
+// }
+__global__ void copy_values_kernel(LL d,
+                                   LL k,
+                                   LL d_block_size,
+                                   LL k_block_size,
+                                   int16* indices,
+                                   void* inp,
+                                   void* out,
+                                   int direction,
+                                   int inp_bits,
+                                   int out_bits) {
     /*
         direction == COPY_DIRECTION_k2d: input is k-dim and output is d-dim
         direction == COPY_DIRECTION_d2k: input is d-dim and output is k-dim
@@ -239,7 +268,8 @@ __global__ void copy_values_kernel_bf16<<<blocks, threads>>>(d,
         LL di = d_index_start + indices[ki];
         LL inp_index = (direction == COPY_DIRECTION_k2d) ? ki : di;
         LL out_index = (direction == COPY_DIRECTION_k2d) ? di : ki;
-        out[out_index] = inp[inp_index];
+
+        dynamically_assign(out, inp, out_index, inp_index, out_bits, inp_bits);
     }
 }
 void copy_values_cuda(LL d,
@@ -250,30 +280,34 @@ void copy_values_cuda(LL d,
                       torch::Tensor inp,
                       torch::Tensor out,
                       int direction) {
-    assert(k_block_size <= 1024);
-    LL blocks = 1 + (LL)(k / k_block_size);
 
-    // determine the number of threads as the first power of 2 larger than or equal to k_block_size
-    LL threads = 1;
-    while(threads < k_block_size) {
-        threads <<= 1;
-    }
+    LL blocks = div_inc(k, k_block_size);
+    LL threads = get_threads(k_block_size);
 
-    switch(vector.scalar_type()) {
-        case torch::ScalarType::BFloat16:
-            copy_values_kernel_bf16<<<blocks, threads>>>(d,
-                                                         k,
-                                                         d_block_size,
-                                                         k_block_size,
-                                                         (int16*) indices.data_ptr(),
-                                                         (bfloat16*) inp.data_ptr(),
-                                                         (bfloat16*) out.data_ptr());
-            break;
-        case torch::ScalarType::Float:
-            printf("copy_values was not implemented for float32!\n");
-            exit(666);
-            break;
-    }
+    // we know that inp and out have either Float or BFloat16 type
+    int inp_bits = (torch::ScalarType::BFloat16 == inp.scalar_type())? 16 : 32;
+    int out_bits = (torch::ScalarType::BFloat16 == out.scalar_type())? 16 : 32;
+
+    copy_values_kernel<<<blocks, threads>>>(d,
+                                            k,
+                                            d_block_size,
+                                            k_block_size,
+                                            (int16*) indices.data_ptr(),
+                                            inp.data_ptr(),
+                                            out.data_ptr(),
+                                            direction,
+                                            inp_bits,
+                                            out_bits);
+
+//     copy_values_kernel_inp_bf16_out_bf16<<<blocks, threads>>>(d,
+//                                                               k,
+//                                                               d_block_size,
+//                                                               k_block_size,
+//                                                               (int16*) indices.data_ptr(),
+//                                                               (bfloat16*) inp.data_ptr(),
+//                                                               (bfloat16*) out.data_ptr(),
+//                                                               direction);
+
     // error checks
 	GPU_ERROR_CHECK(cudaGetLastError());
 	GPU_ERROR_CHECK(cudaPeekAtLastError());

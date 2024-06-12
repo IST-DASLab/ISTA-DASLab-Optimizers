@@ -102,11 +102,14 @@ void copy_values(LL d,
                  torch::Tensor inp,
                  torch::Tensor out,
                  int direction) {
-    assert(direction == COPY_DIRECTION_k2d || direction == COPY_DIRECTION_d2k);
-
     CHECK_INPUT(indices);
     CHECK_INPUT(inp);
     CHECK_INPUT(out);
+    ASSERT_FLOAT_16_OR_32(inp);
+    ASSERT_FLOAT_16_OR_32(out);
+
+    assert(direction == COPY_DIRECTION_k2d || direction == COPY_DIRECTION_d2k);
+    assert(k_block_size <= 1024);
 
     const at::cuda::OptionalCUDAGuard device_guard(device_of(indices));
     copy_values_cuda(d, k, d_block_size, k_block_size, indices, inp, out, direction);
