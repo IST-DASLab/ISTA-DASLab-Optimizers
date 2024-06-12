@@ -1,6 +1,6 @@
 import math
 import torch
-from ..tools import block_split, KernelVersionsManager
+from ..tools import block_split, KernelVersionsManager, CopyDirection
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -99,26 +99,32 @@ class SparseCoreMFACwithEF:
                 k=self.last_k,
                 sorted=False).indices.to(torch.int16)
 
-        # copy the values from the error feedback accumulator to values V (this is the G update), e.g. V[index,:] = error[I[index, :]]
-        # the large tensor (error, size d) is copied to the small tensor (V, size k)
-        ista_daslab_tools.copy_values_large_to_small(self.d,
-                                                     self.k,
-                                                     self.d_block_size,
-                                                     self.k_block_size,
-                                                     self.I[self.buffer_index, :],
-                                                     self.error,
-                                                     self.V[self.buffer_index, :])
-
-        # the small tensor (V, size k) is copied to the large tensor (g, size d)
+        ### copy the values from the error feedback accumulator to values V (this is the G update),
+        ### the large tensor (error, size d) is copied to the small tensor (V, size k)
+        # norm_last_v_1 = self.V[self.buffer_index, :].norm(p=2).item()
+        ista_daslab_tools.copy_values(self.d,  # V = error[I[buffer_index, :]]
+                                      self.k,
+                                      self.d_block_size,
+                                      self.k_block_size,
+                                      self.I[self.buffer_index, :], # indices
+                                      self.error, # inp
+                                      self.V[self.buffer_index, :], # output
+                                      CopyDirection.d2k.value)
+        # norm_last_v_2 = self.V[self.buffer_index, :].norm(p=2).item()
+        ### the small tensor (V, size k) is copied to the large tensor (g, size d)
         g.zero_() # this will contain the values in V, at the right indices, but will also contain zeros
-        ista_daslab_tools.copy_values_small_to_large(self.d, # this does out[I[index]] = vector
-                                                     self.k,
-                                                     self.d_block_size,
-                                                     self.k_block_size,
-                                                     self.I[self.buffer_index, :], # indices
-                                                     self.V[self.buffer_index, :], # vector
-                                                     g) # out
-
+        # norm_g_before = g.norm(p=2).item()
+        ista_daslab_tools.copy_values(self.d,  # this does g[I[buffer_index]] = V
+                                      self.k,
+                                      self.d_block_size,
+                                      self.k_block_size,
+                                      self.I[self.buffer_index, :],  # indices
+                                      self.V[self.buffer_index, :],  # inp
+                                      g, # out
+                                      CopyDirection.k2d.value)
+        # norm_g_after = g.norm(p=2).item()
+        # norm_last_v_3 = self.V[self.buffer_index, :].norm(p=2).item()
+        # print(f'[_apply_ef_then_topk]{self.steps=}\n\t{norm_g_before=}, {norm_g_after=}\n\t{norm_last_v_1=}, {norm_last_v_2=}, {norm_last_v_3=}')
         # zerorize error: subtract the top-k values (saved in V[index, :]), which are also present in g
         self.error.sub_(g)
 
@@ -131,6 +137,11 @@ class SparseCoreMFACwithEF:
         """
         self.steps += 1
         self._apply_ef_then_topk(g) # after this call, g will contain the top-k values and zeros
+
+        # norm_g = g.norm(p=2).item()
+        # norm_last_v = self.V[self.buffer_index, :].norm(p=2).item()
+        # print(f'{self.steps=}, {norm_g=}, {norm_last_v=}')
+
         dots = self._integrate_gradient(topk_values_w_zeros=g)
         p = self._precondition(g, dots) # here we precondition the sparse gradient, e.g. only the top-k values, stored in the d-dim tensor g
         return p

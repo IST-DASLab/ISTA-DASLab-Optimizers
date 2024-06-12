@@ -1,6 +1,8 @@
+import wandb
 import torch
 from .sparse_core_mfac_w_ef import SparseCoreMFACwithEF
-from ..tools import get_first_device, get_gpus, get_weights_and_gradients, update_model
+from ..tools import get_first_device, get_gpus, get_weights_and_gradients, update_model, get_gpu_mem_usage
+
 
 class SparseMFAC(torch.optim.Optimizer):
     def __init__(self, params, lr: float, damp: float, m: int, k_init: float, weight_decay: float, use_bf16: bool):
@@ -27,7 +29,7 @@ class SparseMFAC(torch.optim.Optimizer):
 
         ##### scalar variables
         self.steps = 0
-        self.log_interval = 50
+        self.log_interval = 100
         self.grad_norms_sum = 0
 
         self.wandb_data = dict()
@@ -69,19 +71,17 @@ class SparseMFAC(torch.optim.Optimizer):
         ##################################################
         ########## LOGS
         ##################################################
-        # if self.log_interval > 0 and self.steps % self.log_interval == 0:
-        #     norm_error = self.efm.error.norm(p=2)
-        #     self.wandb_data.update({
-        #         'epoch/cos_g_u': self.cos(g_dense, update),     # rotation induced by EF, TopK and preconditioning over g
-        #         'epoch/step': self.steps,
-        #         'epoch/norm_g': norm_g_dense,
-        #         'epoch/norm_error': norm_error,
-        #         'epoch/ef_norm_div_grad_norm_sum': norm_error / self.grad_norms_sum,
-        #         'epoch/norm_u': update.norm(p=2),
-        #         'epoch/gpu_mem_usage': get_gpu_mem_usage(),
-        #     })
-        #     self.wandb_data.update(dict(norm_upd_w_lr=lr * update.norm(p=2)))
-        #     self.wandb_data.update(self.sp_prec_ef.wandb_data)
-        #     wandb.log(self.wandb_data)
+        if self.log_interval > 0 and self.steps % self.log_interval == 0:
+            norm_error = self.core_mfac.error.norm(p=2)
+            self.wandb_data.update({
+                'epoch/step': self.steps,
+                'epoch/norm_g': norm_g_dense,
+                'epoch/norm_error': norm_error,
+                'epoch/ef_norm_div_grad_norm_sum': norm_error / self.grad_norms_sum,
+                'epoch/norm_u': update.norm(p=2),
+                'epoch/gpu_mem_usage': get_gpu_mem_usage(),
+            })
+            self.wandb_data.update(self.core_mfac.wandb_data)
+            wandb.log(self.wandb_data)
 
         return loss
