@@ -40,7 +40,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line) {
     }
 }
 
-__device__ inline long div_inc(long a, long b) {
+__host__ __device__ inline long div_inc(long a, long b) {
 	long r = a / b;
 	return (a % b > 0) ? (r + 1) : r;
 }
@@ -75,6 +75,39 @@ __device__ inline long log_threads(long T) {
 	if(T == 1024) return 10;
 }
 
+inline LL get_threads(LL max_threads) {
+    /*
+        This method computes the number of threads as the first power of 2 larger than or equal to max_threads
+    */
+    LL threads = 1;
+    while(threads < max_threads) {
+        threads <<= 1;
+    }
+    return threads;
+}
+
+__device__ inline void dynamically_assign(void *out, void *inp, int out_index, int inp_index, int out_bits, int inp_bits) {
+    /*
+        This function assigns out[out_index] = inp[inp_index] based on the types and performs the conversions when needed:
+        - when out and inp are both BFloat16 or Float, the assignment is done directly without any conversion
+        - when out and inp have different data types, the correct functions (float-to-bfloat16 or bfloat16-to-float) are called accordingly
+        We do not have implicit cast between float and bfloat16, we have to call specific CUDA functions for this
+    */
+    if(out_bits == inp_bits) { // out and inp have the same type, so assign without any conversion
+        if(out_bits == 16) { // both are bfloat16
+            ((bfloat16*)out)[out_index] = ((bfloat16*)inp)[inp_index];
+        } else { // both are float
+            ((float*)out)[out_index] = ((float*)inp)[inp_index];
+        }
+    } else { // out and inp have different types, we have to check both to know which conversion function we have to call
+        if(out_bits == 16 && inp_bits == 32) { // convert float to bfloat16
+            ((bfloat16*)out)[out_index] = __float2bfloat16(((float*)inp)[inp_index]);
+        } else if (out_bits == 32 && inp_bits == 16) { // convert bfloat16 to float
+            ((float*)out)[out_index] = __bfloat162float(((bfloat16*)inp)[inp_index]);
+        }
+    }
+}
+
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
@@ -84,6 +117,7 @@ __device__ inline long log_threads(long T) {
 #define DOUBLE_EPS std::numeric_limits<double>::epsilon()
 #define GPU_ERROR_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 #define ASSERT_BF16(x) { assert(torch::ScalarType::BFloat16 == x.scalar_type()); }
+#define ASSERT_FLOAT_16_OR_32(x) { assert(torch::ScalarType::BFloat16 == x.scalar_type() || torch::ScalarType::Float == x.scalar_type()); }
 
 #define COPY_DIRECTION_k2d 0
 #define COPY_DIRECTION_d2k 1
