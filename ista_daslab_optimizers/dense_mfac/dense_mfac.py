@@ -23,7 +23,6 @@ class DenseMFAC(torch.optim.Optimizer):
         self.damp = damp
         self.weight_decay = weight_decay
         self.device = get_first_device()
-        self.gpus = get_gpus()
 
         self.model_size = None
         self.steps = 0
@@ -37,7 +36,7 @@ class DenseMFAC(torch.optim.Optimizer):
         self.hinv = DenseCoreMFAC(
             grads=torch.zeros((ngrads, self.model_size), dtype=torch.float),
             dev=self.device,
-            gpus=gpus,
+            gpus=get_gpus(),
             damp=damp,
             create_G=create_G)
 
