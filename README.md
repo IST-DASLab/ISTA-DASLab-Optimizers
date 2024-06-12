@@ -36,9 +36,9 @@ source install.sh
 
 ## How to use optimizers?
 
-We provide a minimal working example with ResNet-18 and CIFAR-10 for optimizers `micro-adam`, `acdc`, `sparse-mfac`, `dense-mfac`:
+We provide a minimal working example with ResNet-18 and CIFAR-10 for optimizers `micro_adam`, `acdc`, `sparse_mfac`, `dense_mfac`:
 ```shell
-OPTIMIZER=micro-adam # or any other optimizer listed above
+OPTIMIZER=micro_adam # or any other optimizer listed above
 bash run_${OPTIMIZER}.sh
 ```
 
