@@ -188,8 +188,18 @@ def setup_wandb(args):
         config=args,
         settings=wandb.Settings(start_method='fork'))
 
+def check_args(args):
+    """
+        This method performs checks to make sure that the parameter combination is valid.
+        For example, bf16 precision for SparseMFAC is not allowed
+    """
+    if args.optimizer == 'sparse-mfac':
+        if args.precision == 'bf16':
+            raise RuntimeError('BFloat16 precision is currently not supported for SparseMFAC!')
+
 def main():
     args = get_arg_parse()
+    check_args(args)
     setup_wandb(args)
     set_all_seeds(args.seed)
     model = get_model(args.model, args.dataset_name, args.precision).to('cuda:0')
@@ -215,7 +225,7 @@ def main():
             x = x.cuda(non_blocking=True)
             y = y.cuda(non_blocking=True)
 
-            if args.precision in ['bf16', 'bfloat16']:
+            if args.precision == 'bf16':
                 x = x.to(dtype=torch.bfloat16)
 
             crt_batch_size = x.shape[0]
