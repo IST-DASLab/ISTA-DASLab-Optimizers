@@ -13,7 +13,7 @@ CUDA_VISIBLE_DEVICES=7 python example.py \
     --m 1024 \
     --k 0.01 \
     \
-    --precision bf16 \
+    --precision f32 \
     \
     --wandb_project ista-daslab-optimizers \
     --wandb_group example \
