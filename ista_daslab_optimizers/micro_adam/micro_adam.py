@@ -4,7 +4,7 @@ import math
 import time
 import wandb
 from torch.distributed import is_initialized, get_rank
-from ..tools import get_first_device, get_gpu_mem_usage, block_split
+from ..tools import get_first_device, get_gpu_mem_usage, block_split, CopyDirection
 
 import ista_daslab_tools
 import ista_daslab_micro_adam
@@ -161,13 +161,15 @@ class MicroAdam(torch.optim.Optimizer):
                                             k=k_block_size_few,  # example: slice has size 1, but ks[-1] is 4
                                             sorted=False).indices.to(dtype=torch.int16).view(-1)
 
-        ista_daslab_tools.copy_values_large_to_small(d,
-                                                   k,
-                                                   d_block_size,
-                                                   k_block_size_many,
-                                                   I[index, :],
-                                                   grad,
-                                                   V[index, :], )  # this does V[index,:] = a[I[index]]
+        ista_daslab_tools.copy_values(d,  # V = error[I[buffer_index, :]]
+                                      k,
+                                      d_block_size,
+                                      k_block_size_many,
+                                      I[index, :],  # indices
+                                      grad,  # inp
+                                      V[index, :],  # output
+                                      CopyDirection.d2k.value)
+
         st['index'] = (index + 1) % self.m
 
         ##### STEP 6
