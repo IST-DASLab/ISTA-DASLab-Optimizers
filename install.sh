@@ -9,7 +9,7 @@ conda activate $ENV_NAME
 
 echo ">>>>> Installing required packages..."
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip3 install wandb gpustat timm
+pip3 install wandb gpustat timm einops
 
 echo ">>>>> Installing ISTA-DASLab-Optimizers..."
 pip3 install .
