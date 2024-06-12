@@ -12,5 +12,5 @@ build/
 dist/
 *.egg-info/
 __pycache__/
-examples/data/
-examples/wandb/
+examples/cifar10/data/
+examples/cifar10/wandb/
