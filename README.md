@@ -2,45 +2,46 @@
 This repository contains optimization algorithms for Deep Learning developed by 
 the Distributed Algorithms and Systems lab at Institute of Science and Technology Austria.
 
-## Project status
-- **June 5th, 2024**:
-  - *DONE*: the project is locally installable via `pip install .` 
-  - *NEXT*:
-    - working on examples for Sparse M-FAC and Dense M-FAC
-- **May 27th, 2024**:
-  - we are currently working on solving the issues with the installation via `pip`. 
+The repository contains code for the following optimizers published by DASLab @ ISTA:
+- **AC/DC**:
+  - paper: [AC/DC: Alternating Compressed/DeCompressed Training of Deep Neural Networks](https://arxiv.org/abs/2106.12379)
+  - official repository: [GitHub](https://github.com/IST-DASLab/ACDC)
+- **M-FAC**:
+  - paper: [M-FAC: Efficient Matrix-Free Approximations of Second-Order Information](https://arxiv.org/abs/2107.03356)
+  - official repository: [GitHub](https://github.com/IST-DASLab/M-FAC)
+- **Sparse M-FAC with Error Feedback**:
+  - paper: [Error Feedback Can Accurately Compress Preconditioners](https://arxiv.org/abs/2306.06098)
+  - official repository: [GitHub](https://github.com/IST-DASLab/EFCP/)
+- **MicroAdam**:
+  - paper: [MicroAdam: Accurate Adaptive Optimization with Low Space Overhead and Provable Convergence](https://arxiv.org/abs/2405.15593)
+  - official repository: [GitHub](https://github.com/IST-DASLab/MicroAdam)
 
 ### Installation
-We provide a script `install.sh` that creates a new environment, installs requirements 
-and then builds the optimizers project. First of all, you have to clone this repository, then 
-run the installation script.
+To use the latest stable version of the repository, you can install via pip:
+
+```shell
+pip3 install ista-daslab-optimizers
+```
+
+We also provide a script `install.sh` that creates a new environment, installs requirements
+and then installs the project as a Python package following these steps:
+
 ```shell
 git clone git@github.com:IST-DASLab/ISTA-DASLab-Optimizers.git
 cd ISTA-DASLab-Optimizers
 source install.sh
 ```
 
-[//]: # (### ⚠️ Important Notice ⚠️)
-
-[//]: # (We noticed it is useful to compile the kernels for each individual CUDA capability separately. For example, for CUDA capability &#40;CC&#41; 8.6, )
-
-[//]: # (the CUDA kernels for `MicroAdam` will be installed in the package `micro_adam_sm86`, while for CC 9.0 it will be installed in the package)
-
-[//]: # (`micro_adam_sm90`. Please install this library for each system where the CC is different to cover all possible cases for your system. The )
-
-[//]: # (code will automatically detect the CC version and import the correct package if installed, otherwise will throw an error. The code that )
-
-[//]: # (dynamically detects the CC version can be found )
-
-[//]: # ([here]&#40;https://github.com/IST-DASLab/ISTA-DASLab-Optimizers/blob/main/ista_daslab_optimizers/tools.py#L17&#41;.)
-
 ## How to use optimizers?
 
-We provide a minimal working example with ResNet-18 and CIFAR-10 for optimizers `micro_adam`, `acdc`, `sparse_mfac`, `dense_mfac`:
+In this repository we provide a minimal working example for CIFAR-10 for optimizers `acdc`, `dense_mfac`, `sparse_mfac` and `micro_adam`:
 ```shell
+cd examples/cifar10
 OPTIMIZER=micro_adam # or any other optimizer listed above
 bash run_${OPTIMIZER}.sh
 ```
+
+To integrate the optimizers into your own pipeline, you can use the following snippets:
 
 ### MicroAdam optimizer
 ```python
