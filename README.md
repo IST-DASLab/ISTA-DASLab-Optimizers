@@ -59,3 +59,16 @@ optimizer = MicroAdam(
 
 # from now on, you can use the variable `optimizer` as any other PyTorch optimizer
 ```
+
+# Versions summary:
+
+---
+
+- **0.0.2** @ June 20th, 2024:
+  
+  - changed minimum required Python version to 3.8+ and torch to 2.3.0+
+
+- **0.0.1** @ June 13th, 2024:
+
+  - added initial version of the package for Python 3.9+ and torch 2.3.1+
+  - AC/DC not tested yet
