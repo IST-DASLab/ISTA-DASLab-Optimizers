@@ -64,6 +64,10 @@ optimizer = MicroAdam(
 
 ---
 
+- **1.0.1** @ June 27th, 2024:
+
+  - removed version in dependencies to avoid conflicts with llm-foundry
+
 - **1.0.0** @ June 20th, 2024:
   
   - changed minimum required Python version to 3.8+ and torch to 2.3.0+
