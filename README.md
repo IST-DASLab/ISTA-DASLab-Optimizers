@@ -63,10 +63,6 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
-
-- **1.0.2** @ June 27th, 2024:
-
-  - using `torch==2.2.1`, `torchaudio==2.2.1` and `torchvision==0.17.1` to avoid conflicts with llm-foundry
  
 - **1.0.1** @ June 27th, 2024:
 
