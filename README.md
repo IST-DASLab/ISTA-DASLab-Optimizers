@@ -63,7 +63,12 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
- 
+
+- **1.0.2** @ July 31st, 2024:
+
+  - added FSDP-compatible implementation by initializing the parameter states in the `update_step` method
+  instead of MicroAdam constructor  
+
 - **1.0.1** @ June 27th, 2024:
 
   - removed version in dependencies to avoid conflicts with llm-foundry
