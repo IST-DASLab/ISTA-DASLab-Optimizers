@@ -43,7 +43,7 @@ class MicroAdam(torch.optim.Optimizer):
         for param in self.param_groups:
             for p in param['params']:
                 size = p.numel()
-                print(p.shape, p.numel())
+                # print(p.shape, p.numel())
                 self.dict_size_count[size] = 1 + self.dict_size_count.get(size, 0)
 
         # self._init_state()
@@ -286,17 +286,21 @@ class MicroAdam(torch.optim.Optimizer):
 
     def _log(self, norm_g, norm_u, norm_e, sparsity_u, elapsed_step):
         if self.steps % self.log_interval == 0:
-            wandb_data = {
-                'step/optimizer_steps': self.steps,
-                'step/gpu_mem_usage': get_gpu_mem_usage(),
-                'step/norm_g': math.sqrt(norm_g),
-                'step/norm_u': math.sqrt(norm_u),
-                'step/norm_error': math.sqrt(norm_e),
-                'step/sparsity_u': sparsity_u / self.model_size * 100.,
-                'step/elapsed_step': elapsed_step,
-            }
+            sync_data = torch.tensor([norm_g, norm_u, norm_e, sparsity_u, elapsed_step], dtype=torch.float,
+                                     requires_grad=False).cuda()  # correct, loss, size
+            dist.all_reduce(sync_data, op=dist.ReduceOp.SUM)
+            norm_g, norm_u, norm_e, sparsity_u, elapsed_step = sync_data
 
             if not is_initialized() or get_rank() == 0:
+                wandb_data = {
+                    'step/optimizer_steps': self.steps,
+                    'step/gpu_mem_usage': get_gpu_mem_usage(),
+                    'step/norm_g': math.sqrt(norm_g),
+                    'step/norm_u': math.sqrt(norm_u),
+                    'step/norm_error': math.sqrt(norm_e),
+                    'step/sparsity_u': sparsity_u / self.model_size * 100.,
+                    'step/elapsed_step': elapsed_step,
+                }
                 wandb.log(wandb_data, commit=False)
 
     # def _update_lr_wd(self):
