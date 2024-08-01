@@ -144,7 +144,7 @@ __global__ void LCG_v51_bf16(long d,
 
     long i; // vector index (for indices and values)
 	long k_col; // column index to extract data from indices and values at the current row
-	long index; // the 1-D index to extract data from indices and values at the current row (row * k + k_col)
+// 	long index; // the 1-D index to extract data from indices and values at the current row (row * k + k_col)
 	int16 ind; // the data from indices at the index "index"
 	bfloat16 val; // the data from values at the index "index"
 
