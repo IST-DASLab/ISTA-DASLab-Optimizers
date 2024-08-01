@@ -43,8 +43,8 @@ __global__ void asymm_block_quant_inv_kernel_bf16_bf16(LL d, LL q_block_size, ui
 		lsb = (vq & 0x0F);
 
         // += operation happens here
-		vx2.x += __float2bfloat16(msb * u + m) * alpha;
-		vx2.y += __float2bfloat16(lsb * u + m) * alpha;
+		vx2.x += __float2bfloat16((msb * u + m) * alpha);
+		vx2.y += __float2bfloat16((lsb * u + m) * alpha);
 		x2[half_index] = vx2;
 	}
 	if((d & 1) && (Bid == B-1) && (Tid == T-1)) {
@@ -52,7 +52,7 @@ __global__ void asymm_block_quant_inv_kernel_bf16_bf16(LL d, LL q_block_size, ui
 		vq = xq[half_d];
 		msb = (vq & 0xF0) >> 4;
 		// += operation happens here
-		vx += __float2bfloat16(msb * u + m) * alpha;
+		vx += __float2bfloat16((msb * u + m) * alpha);
 		x[d - 1] = vx;
 	}
 }
