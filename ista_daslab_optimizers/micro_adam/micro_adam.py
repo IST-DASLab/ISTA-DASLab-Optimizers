@@ -3,7 +3,7 @@ import torch
 import math
 import time
 import wandb
-from torch.distributed import is_initialized, get_rank
+from torch.distributed import is_initialized, get_rank, all_reduce, ReduceOp
 from ..tools import get_first_device, get_gpu_mem_usage, block_split, CopyDirection
 
 import ista_daslab_tools
@@ -288,7 +288,7 @@ class MicroAdam(torch.optim.Optimizer):
         if self.steps % self.log_interval == 0:
             sync_data = torch.tensor([norm_g, norm_u, norm_e, sparsity_u, elapsed_step], dtype=torch.float,
                                      requires_grad=False).cuda()  # correct, loss, size
-            dist.all_reduce(sync_data, op=dist.ReduceOp.SUM)
+            all_reduce(sync_data, op=ReduceOp.SUM)
             norm_g, norm_u, norm_e, sparsity_u, elapsed_step = sync_data
 
             if not is_initialized() or get_rank() == 0:
