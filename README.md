@@ -64,12 +64,12 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
-- **1.1.1** @ August 1st, 2024:
-  - added FSDP-compatible implementation by initializing the parameter states in the `update_step` method
-  instead of MicroAdam constructor  
-  - added support to densify the final update: introduced parameter alpha that controls the fraction of error feedback
+- **1.1.2** @ August 1st, 2024:
+  - ***[1.1.0]:*** added support to densify the final update: introduced parameter alpha that controls the fraction of error feedback
   (EF) to be integrated into the update to make it dense. Finally, the fraction alpha will be discarded from the EF at
   the expense of another call to `Qinv` and `Q` (and implicitly quantization statistics computation).
+  - ***[1.0.2]:*** added FSDP-compatible implementation by initializing the parameter states in the `update_step` method
+  instead of MicroAdam constructor
 
 - **1.0.1** @ June 27th, 2024:
   - removed version in dependencies to avoid conflicts with llm-foundry
