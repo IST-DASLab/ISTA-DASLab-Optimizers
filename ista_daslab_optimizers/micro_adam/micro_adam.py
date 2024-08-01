@@ -243,7 +243,10 @@ class MicroAdam(torch.optim.Optimizer):
         ##### END IF PRETRAINING #1
 
         # if alpha > 0, then the update u=p.grad is dense now
-        p.mul_(1 - lr * wd).add_(p.grad, alpha=-lr)
+        if wd > 0:
+            p.mul_(1 - lr * wd)
+
+        p.add_(p.grad, alpha=-lr)
 
         if self.steps % self.log_interval == 0:
             norm_u = grad.norm(p=2) ** 2
