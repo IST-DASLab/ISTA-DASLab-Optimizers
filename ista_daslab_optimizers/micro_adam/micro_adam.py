@@ -245,6 +245,10 @@ class MicroAdam(torch.optim.Optimizer):
         # if alpha > 0, then the update u=p.grad is dense now
         p.mul_(1 - lr * wd).add_(p.grad, alpha=-lr)
 
+        if self.steps % self.log_interval == 0:
+            norm_u = grad.norm(p=2) ** 2
+            sp_u = (grad == 0).sum()  # check sparsity before zerorizing
+
         ##### if PRETRAINING #2
         if self.densify_update:
             grad.zero_()
@@ -256,9 +260,6 @@ class MicroAdam(torch.optim.Optimizer):
 
         # compute error norm
         if self.steps % self.log_interval == 0:
-            norm_u = grad.norm(p=2) ** 2
-            sp_u = (grad == 0).sum()  # check sparsity before zerorizing
-
             grad.zero_()
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0)
 
