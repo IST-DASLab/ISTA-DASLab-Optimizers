@@ -55,6 +55,7 @@ optimizer = MicroAdam(
     lr=1e-5, # change accordingly
     quant_block_size=100_000, # 32 or 64 also works
     k_init=0.01, # float between 0 and 1 meaning percentage: 0.01 means 1%
+    alpha=0, # 0 means sparse update and 0 < alpha < 1 means we integrate fraction alpha from EF to update and then delete it
 )
 
 # from now on, you can use the variable `optimizer` as any other PyTorch optimizer
@@ -63,6 +64,12 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+
+- **1.1.0** @ August 1st, 2024:
+  
+  - added support to densify the final update: introduced parameter alpha that controls the fraction of error feedback
+  (EF) to be integrated into the update to make it dense. Finally, the fraction alpha will be discarded from the EF at
+  the expense of another call to `Qinv` and `Q` (and implicitly quantization statistics computation).
 
 - **1.0.2** @ July 31st, 2024:
 

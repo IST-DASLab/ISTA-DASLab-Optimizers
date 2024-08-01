@@ -11,19 +11,23 @@ import ista_daslab_micro_adam
 
 
 class MicroAdam(torch.optim.Optimizer):
-    def __init__(self, params, m, lr, quant_block_size, k_init=0.01, betas=(0.9, 0.999), weight_decay=0, eps=1e-8):
-        defaults = dict(lr=lr, weight_decay=weight_decay, eps=eps)
+    def __init__(self, params, m, lr, quant_block_size, k_init=0.01, alpha=0, betas=(0.9, 0.999), weight_decay=0, eps=1e-8):
+        defaults = dict(lr=lr, weight_decay=weight_decay, eps=eps, alpha=alpha)
         super(MicroAdam, self).__init__(params, defaults)
+
+        assert 0 <= alpha < 1, 'Alpha must be in the [0, 1) interval'
 
         self.m = m
         self.lr = lr
         self.quant_block_size = int(quant_block_size)
         self.k_init = k_init
+        self.alpha = alpha
         self.weight_decay = weight_decay
         self.beta1 = betas[0]
         self.beta2 = betas[1]
         self.eps = eps
 
+        self.densify_update = (self.alpha > 0)
         self.model_size = sum([p.numel() for group in self.param_groups for p in group['params']])
 
         self.steps = 0  # how many optimization steps were performed so far
@@ -47,48 +51,6 @@ class MicroAdam(torch.optim.Optimizer):
                 self.dict_size_count[size] = 1 + self.dict_size_count.get(size, 0)
 
         # self._init_state()
-
-    # def _init_state(self):
-    #     count = 0
-    #     for group in self.param_groups:
-    #         lr = group['lr']
-    #         wd = group.get('weight_decay', self.weight_decay) # if the param groups do not have weight decay, then use the external one
-    #         for p in group['params']:
-    #             if not p.requires_grad:
-    #                 continue
-
-    #             print(f'[init_state] rank={torch.distributed.get_rank()}, p.shape={p.shape}')
-
-    #             count += 1
-    #             layer_size = p.numel()
-    #             st = self.state[p]
-
-    #             # B * t / d * nt
-    #             st['blocks'] = max(1, int(math.floor(self.blocks * layer_size * self.dict_size_count[layer_size] / self.model_size)))
-
-    #             st['lr'] = lr
-    #             st['weight_decay'] = wd
-    #             st['d'] = layer_size
-
-    #             ##### variables for Top-K: d_index_topk is the index where the last, smaller topk block starts
-    #             st['d_block_size'] = layer_size if layer_size < self.d_block_size else self.d_block_size
-    #             st['topk_full_blocks_count'], st['d_index_topk'] = block_split(st['d'], st['d_block_size'])
-    #             st['k_block_size_many'] = int(math.ceil(st['d_block_size'] * self.k_init))
-    #             st['k_block_size_few'] = int(math.ceil((st['d'] - st['d_index_topk']) * self.k_init))  # 0 for d % self.d_block_size = 0
-    #             st['k_index'] = st['topk_full_blocks_count'] * st['k_block_size_many']
-    #             st['k'] = st['k_block_size_many'] * st['topk_full_blocks_count'] + st['k_block_size_few']
-
-    #             ##### variables for the ring buffer
-    #             st['index'] = 0  # the position to place a new gradient at
-    #             st['I'] = torch.zeros(self.m, st['k'], dtype=torch.int16, device=self.device)  # 2mk bytes
-    #             st['V'] = torch.zeros(self.m, st['k'], dtype=torch.bfloat16, device=self.device)  # 2mk bytes
-
-    #             ### variables for error feedback: d_index_quant is the index where the last, smaller quantization block starts
-    #             # st['quant_block_size'] = layer_size if layer_size < self.quant_block_size else self.quant_block_size
-    #             st['quant_full_blocks_count'], st['d_index_quant'] = block_split(st['d'], self.quant_block_size)
-    #             st['error'] = torch.zeros(int(math.ceil(st['d'] / 2)), dtype=torch.uint8, device=self.device)  # ceil(d/2) bytes
-    #             st['min_vals'] = torch.zeros(st['quant_full_blocks_count'] + 1, dtype=torch.bfloat16, device=self.device)  # ceil(d/q_bsz)*2 bytes
-    #             st['max_vals'] = torch.zeros(st['quant_full_blocks_count'] + 1, dtype=torch.bfloat16, device=self.device)  # ceil(d/q_bsz)*2 bytes
 
     def _initialize_parameter_state(self, p, lr, wd):
         layer_size = p.numel()
@@ -211,7 +173,7 @@ class MicroAdam(torch.optim.Optimizer):
         max_vals = st['max_vals']
 
         ##### STEP 4
-        ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad)
+        ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0) # alpha=1 here
 
         ##### STEP 5 + 9 (only for I)
         I[index, :k_index] = torch.topk(input=grad[0:d_index_topk].abs().view(topk_full_blocks_count, d_block_size),
@@ -238,15 +200,18 @@ class MicroAdam(torch.optim.Optimizer):
         ista_daslab_tools.zerorize_block_components(grad, I[index, :], d, k, d_block_size, k_block_size_many)  # this does a[I[index]] = 0
 
         ##### STEP 7
-        if quant_full_blocks_count == 1:
-            min_vals[:quant_full_blocks_count] = grad[:d_index_quant].min()
-            max_vals[:quant_full_blocks_count] = grad[:d_index_quant].max()
-        else:
-            min_vals[:quant_full_blocks_count] = grad[:d_index_quant].view(quant_full_blocks_count, self.quant_block_size).min(dim=1).values
-            max_vals[:quant_full_blocks_count] = grad[:d_index_quant].view(quant_full_blocks_count, self.quant_block_size).max(dim=1).values
-        if d_index_quant < d:
-            min_vals[quant_full_blocks_count] = grad[d_index_quant:].min()
-            max_vals[quant_full_blocks_count] = grad[d_index_quant:].max()
+        def _update_quantization_statistics():
+            if quant_full_blocks_count == 1:
+                min_vals[:quant_full_blocks_count] = grad[:d_index_quant].min()
+                max_vals[:quant_full_blocks_count] = grad[:d_index_quant].max()
+            else:
+                min_vals[:quant_full_blocks_count] = grad[:d_index_quant].view(quant_full_blocks_count, self.quant_block_size).min(dim=1).values
+                max_vals[:quant_full_blocks_count] = grad[:d_index_quant].view(quant_full_blocks_count, self.quant_block_size).max(dim=1).values
+            if d_index_quant < d:
+                min_vals[quant_full_blocks_count] = grad[d_index_quant:].min()
+                max_vals[quant_full_blocks_count] = grad[d_index_quant:].max()
+
+        _update_quantization_statistics()
 
         ##### STEP 8
         ista_daslab_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad)  # error = Q(a, min, max)
@@ -269,8 +234,25 @@ class MicroAdam(torch.optim.Optimizer):
                                                         V,  # values
                                                         grad)  # update will be stored here
 
-        ##### STEP 12
+        ##### STEP 12: # side idea: only decay the weights that are update
+
+        ##### if PRETRAINING #1
+        if self.densify_update: # we add alpha * EF to update that is stored in grad buffer
+            # p.grad += alpha * Qinv(error), alpha=0.1
+            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, self.alpha)
+        ##### END IF PRETRAINING #1
+
+        # if alpha > 0, then the update u=p.grad is dense now
         p.mul_(1 - lr * wd).add_(p.grad, alpha=-lr)
+
+        ##### if PRETRAINING #2
+        if self.densify_update:
+            grad.zero_()
+            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1-self.alpha)
+
+            _update_quantization_statistics() # step 7 again
+            ista_daslab_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad) # step 8 again
+        ##### END IF PRETRAINING #2
 
         # compute error norm
         if self.steps % self.log_interval == 0:
@@ -278,7 +260,7 @@ class MicroAdam(torch.optim.Optimizer):
             sp_u = (grad == 0).sum()  # check sparsity before zerorizing
 
             grad.zero_()
-            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad)
+            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0)
 
             norm_e = grad.norm(p=2) ** 2
 
@@ -311,3 +293,46 @@ class MicroAdam(torch.optim.Optimizer):
     #         for p in group['params']:
     #             self.state[p]['lr'] = lr
     #             self.state[p]['wd'] = wd
+
+
+    # def _init_state(self):
+    #     count = 0
+    #     for group in self.param_groups:
+    #         lr = group['lr']
+    #         wd = group.get('weight_decay', self.weight_decay) # if the param groups do not have weight decay, then use the external one
+    #         for p in group['params']:
+    #             if not p.requires_grad:
+    #                 continue
+
+    #             print(f'[init_state] rank={torch.distributed.get_rank()}, p.shape={p.shape}')
+
+    #             count += 1
+    #             layer_size = p.numel()
+    #             st = self.state[p]
+
+    #             # B * t / d * nt
+    #             st['blocks'] = max(1, int(math.floor(self.blocks * layer_size * self.dict_size_count[layer_size] / self.model_size)))
+
+    #             st['lr'] = lr
+    #             st['weight_decay'] = wd
+    #             st['d'] = layer_size
+
+    #             ##### variables for Top-K: d_index_topk is the index where the last, smaller topk block starts
+    #             st['d_block_size'] = layer_size if layer_size < self.d_block_size else self.d_block_size
+    #             st['topk_full_blocks_count'], st['d_index_topk'] = block_split(st['d'], st['d_block_size'])
+    #             st['k_block_size_many'] = int(math.ceil(st['d_block_size'] * self.k_init))
+    #             st['k_block_size_few'] = int(math.ceil((st['d'] - st['d_index_topk']) * self.k_init))  # 0 for d % self.d_block_size = 0
+    #             st['k_index'] = st['topk_full_blocks_count'] * st['k_block_size_many']
+    #             st['k'] = st['k_block_size_many'] * st['topk_full_blocks_count'] + st['k_block_size_few']
+
+    #             ##### variables for the ring buffer
+    #             st['index'] = 0  # the position to place a new gradient at
+    #             st['I'] = torch.zeros(self.m, st['k'], dtype=torch.int16, device=self.device)  # 2mk bytes
+    #             st['V'] = torch.zeros(self.m, st['k'], dtype=torch.bfloat16, device=self.device)  # 2mk bytes
+
+    #             ### variables for error feedback: d_index_quant is the index where the last, smaller quantization block starts
+    #             # st['quant_block_size'] = layer_size if layer_size < self.quant_block_size else self.quant_block_size
+    #             st['quant_full_blocks_count'], st['d_index_quant'] = block_split(st['d'], self.quant_block_size)
+    #             st['error'] = torch.zeros(int(math.ceil(st['d'] / 2)), dtype=torch.uint8, device=self.device)  # ceil(d/2) bytes
+    #             st['min_vals'] = torch.zeros(st['quant_full_blocks_count'] + 1, dtype=torch.bfloat16, device=self.device)  # ceil(d/q_bsz)*2 bytes
+    #             st['max_vals'] = torch.zeros(st['quant_full_blocks_count'] + 1, dtype=torch.bfloat16, device=self.device)  # ceil(d/q_bsz)*2 bytes

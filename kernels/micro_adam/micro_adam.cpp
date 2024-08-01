@@ -13,7 +13,7 @@ void compute_microadam_update_cuda(int blocks, int threads, int carveout,
 						       torch::Tensor indices, torch::Tensor values, torch::Tensor out);
 
 void asymm_block_quant_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
-void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x);
+void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x, float alpha);
 
 // C++ methods
 void compute_microadam_update(int blocks, int threads, int carveout,
@@ -44,14 +44,14 @@ void asymm_block_quant(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xm
 	asymm_block_quant_cuda(d, q_block_size, xq, xmin, xmax, x);
 }
 
-void asymm_block_quant_inv(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x) {
+void asymm_block_quant_inv(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x, float alpha) {
 	CHECK_INPUT(xq);
 	CHECK_INPUT(xmin);
 	CHECK_INPUT(xmax);
 	CHECK_INPUT(x);
 
 	const at::cuda::OptionalCUDAGuard device_guard(device_of(x));
-	asymm_block_quant_inv_cuda(d, q_block_size, xq, xmin, xmax, x);
+	asymm_block_quant_inv_cuda(d, q_block_size, xq, xmin, xmax, x, alpha);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

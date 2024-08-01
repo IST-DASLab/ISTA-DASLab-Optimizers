@@ -1,8 +1,8 @@
 #include "../utils.h"
 
-__global__ void asymm_block_quant_inv_kernel_bf16_bf16(LL d, LL q_block_size, uint8_t *xq, bfloat16 *xmin, bfloat16 *xmax, bfloat16 *x) {
+__global__ void asymm_block_quant_inv_kernel_bf16_bf16(LL d, LL q_block_size, uint8_t *xq, bfloat16 *xmin, bfloat16 *xmax, bfloat16 *x, float alpha) {
 	/*
-		This kernel computes x += Q_inv(xq, xmin, xmax) for 4 bits (implements point 1 from PhD notebook page 55)
+		This kernel computes x += alpha * Q_inv(xq, xmin, xmax) for 4 bits (implements point 1 from PhD #9 notebook page 55)
 		Here, x is the output buffer and will already contain the dense gradient
 		The output buffer x has d components and xq has d/2 components because one uint8_t stores two 4-bit values
 		In contrast to "globally" kernel, this kernel works with a single block
@@ -43,20 +43,21 @@ __global__ void asymm_block_quant_inv_kernel_bf16_bf16(LL d, LL q_block_size, ui
 		lsb = (vq & 0x0F);
 
         // += operation happens here
-		vx2.x += __float2bfloat16(msb * u + m);
-		vx2.y += __float2bfloat16(lsb * u + m);
+		vx2.x += __float2bfloat16(msb * u + m) * alpha;
+		vx2.y += __float2bfloat16(lsb * u + m) * alpha;
 		x2[half_index] = vx2;
 	}
 	if((d & 1) && (Bid == B-1) && (Tid == T-1)) {
 		bfloat16 vx = x[d - 1];
 		vq = xq[half_d];
 		msb = (vq & 0xF0) >> 4;
-		vx += __float2bfloat16(msb * u + m);
+		// += operation happens here
+		vx += __float2bfloat16(msb * u + m) * alpha;
 		x[d - 1] = vx;
 	}
 }
 
-void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x) {
+void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::Tensor xmin, torch::Tensor xmax, torch::Tensor x, float alpha) {
     ASSERT_BF16(xmin);
     ASSERT_BF16(xmax);
     ASSERT_BF16(x);
@@ -72,7 +73,8 @@ void asymm_block_quant_inv_cuda(LL d, LL q_block_size, torch::Tensor xq, torch::
                                                      (uint8_t*) xq.data_ptr(),
                                                      (bfloat16*) xmin.data_ptr(),
                                                      (bfloat16*) xmax.data_ptr(),
-                                                     (bfloat16*) x.data_ptr());
+                                                     (bfloat16*) x.data_ptr(),
+                                                     alpha);
 
     // error checks
 	GPU_ERROR_CHECK(cudaGetLastError());
