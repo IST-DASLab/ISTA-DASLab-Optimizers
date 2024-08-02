@@ -242,7 +242,7 @@ class MicroAdam(torch.optim.Optimizer):
             #
             # [a = -2] without lr
             #     theta_t+1 = theta_t - (a_t - Qinv(e_t+1)) - lr * u_t
-            #               = theta_t - a_t + lr * Qinv(e_t+1) - lr * u_t
+            #               = theta_t - a_t + Qinv(e_t+1) - lr * u_t
             #               = theta_t - a_t              # STEP A below, in this if statmenet
             #                         + Qinv(e_t+1)      # STEP B below, in this if statmenet
             #                         - lr * u_t              # this is steps 10-11
