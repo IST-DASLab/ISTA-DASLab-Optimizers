@@ -15,7 +15,7 @@ class MicroAdam(torch.optim.Optimizer):
         defaults = dict(lr=lr, weight_decay=weight_decay, eps=eps, alpha=alpha)
         super(MicroAdam, self).__init__(params, defaults)
 
-        assert (0 <= alpha < 1) or alpha == -1, 'Alpha must be in the [0, 1) interval or -1'
+        assert (0 <= alpha < 1) or alpha == -2, 'Alpha must be in the [0, 1) interval or -2'
 
         self.m = m
         self.lr = lr
@@ -232,22 +232,29 @@ class MicroAdam(torch.optim.Optimizer):
             #     - p.grad is a_t (from step 6 in algorithm 1)
             #     - error is e_t+1 (from step 8 in algorithm 1)
             #
-            # This is the formula to update the model parameters:
+            # Below we have the formula to update the model parameters:
+            # 1) with lr
             #     theta_t+1 = theta_t - lr * (a_t - Qinv(e_t+1)) - lr * u_t
             #               = theta_t - lr * a_t + lr * Qinv(e_t+1) - lr * u_t
             #               = theta_t - lr * a_t              # STEP A below, in this if statmenet
             #                         + lr * Qinv(e_t+1)      # STEP B below, in this if statmenet
             #                         - lr * u_t              # this is steps 10-11
+            #
+            #     theta_t+1 = theta_t - (a_t - Qinv(e_t+1)) - lr * u_t
+            #               = theta_t - a_t + lr * Qinv(e_t+1) - lr * u_t
+            #               = theta_t - a_t              # STEP A below, in this if statmenet
+            #                         + Qinv(e_t+1)      # STEP B below, in this if statmenet
+            #                         - lr * u_t              # this is steps 10-11
             quant_err.zero_()
             quant_err.add_(p.grad)
 
             ##### STEP A
-            p.add_(p.grad, alpha=-lr)
+            p.add_(p.grad, alpha=-1)
 
             ##### STEP B
             p.grad.zero_() # zerorize to prepare the accumulator for Qinv
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1)
-            p.add_(p.grad, alpha=lr)
+            p.add_(p.grad)
 
             quant_err.sub_(p.grad)
 
