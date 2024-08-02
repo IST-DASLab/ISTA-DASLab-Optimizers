@@ -27,7 +27,9 @@ class MicroAdam(torch.optim.Optimizer):
         self.beta2 = betas[1]
         self.eps = eps
 
-        self.densify_update = (self.alpha > 0)
+        self.densify_update_using_ef = (self.alpha > 0)
+        self.densify_update_using_quant_error = (self.alpha == -1)
+
         self.model_size = sum([p.numel() for group in self.param_groups for p in group['params']])
 
         self.steps = 0  # how many optimization steps were performed so far
@@ -216,6 +218,33 @@ class MicroAdam(torch.optim.Optimizer):
         ##### STEP 8
         ista_daslab_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad)  # error = Q(a, min, max)
 
+        # weight decay step
+        if wd > 0:
+            p.mul_(1 - lr * wd)
+
+        ##### NEW: densify using quant error
+        if self.densify_update_using_quant_error:
+            # When entering this if-statement, we have:
+            #     - p is theta_t
+            #     - p.grad is a_t (from step 6 in algorithm 1)
+            #     - error is e_t+1 (from step 8 in algorithm 1)
+            #
+            # This is the formula to update the model parameters:
+            #     theta_t+1 = theta_t - lr * (a_t - Qinv(e_t+1)) - lr * u_t
+            #               = theta_t - lr * a_t + lr * Qinv(e_t+1) - lr * u_t
+            #               = theta_t - lr * a_t              # STEP A below, in this if statmenet
+            #                         + lr * Qinv(e_t+1)      # STEP B below, in this if statmenet
+            #                         - lr * u_t              # this is steps 10-11
+
+            ##### STEP A
+            p.add_(p.grad, alpha=-lr)
+
+            ##### STEP B
+            p.grad.zero_() # zerorize to prepare the accumulator for Qinv
+            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1)
+            p.add_(p.grad, alpha=lr)
+
+
         ##### STEPS 10-11
         grad.zero_()
         ista_daslab_micro_adam.compute_microadam_update(blocks,  # blocks
@@ -237,15 +266,14 @@ class MicroAdam(torch.optim.Optimizer):
         ##### STEP 12: # side idea: only decay the weights that are update
 
         ##### if PRETRAINING #1
-        if self.densify_update: # we add alpha * EF to update that is stored in grad buffer
+        if self.densify_update_using_ef: # we add alpha * EF to update that is stored in grad buffer
             # p.grad += alpha * Qinv(error), alpha=0.1
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, self.alpha)
         ##### END IF PRETRAINING #1
 
         # if alpha > 0, then the update u=p.grad is dense now
-        if wd > 0:
-            p.mul_(1 - lr * wd)
 
+        # update model using MicroAdam update stored in p.grad
         p.add_(p.grad, alpha=-lr)
 
         if self.steps % self.log_interval == 0:
@@ -253,7 +281,7 @@ class MicroAdam(torch.optim.Optimizer):
             sp_u = (grad == 0).sum()  # check sparsity before zerorizing
 
         ##### if PRETRAINING #2
-        if self.densify_update:
+        if self.densify_update_using_ef:
             grad.zero_()
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1-self.alpha)
 
