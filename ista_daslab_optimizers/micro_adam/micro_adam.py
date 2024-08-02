@@ -15,7 +15,7 @@ class MicroAdam(torch.optim.Optimizer):
         defaults = dict(lr=lr, weight_decay=weight_decay, eps=eps, alpha=alpha)
         super(MicroAdam, self).__init__(params, defaults)
 
-        assert 0 <= alpha < 1, 'Alpha must be in the [0, 1) interval'
+        assert (0 <= alpha < 1) or alpha == -1, 'Alpha must be in the [0, 1) interval or -1'
 
         self.m = m
         self.lr = lr
@@ -60,6 +60,7 @@ class MicroAdam(torch.optim.Optimizer):
 
         rank = torch.distributed.get_rank()
 
+        st['quant_err'] = torch.zeros_like(p)
         st['blocks'] = max(1, int(math.floor(self.blocks * layer_size * self.fsdp_dict_size_count[rank][layer_size] / self.model_size)))
 
         st['lr'] = lr
@@ -108,7 +109,7 @@ class MicroAdam(torch.optim.Optimizer):
 
         time_start = time.time()
 
-        norm_g, norm_u, norm_e, sparsity_u = 0, 0, 0, 0
+        norm_qe, norm_g, norm_u, norm_e, sparsity_u = 0, 0, 0, 0, 0
 
         for group in self.param_groups:
             lr = group['lr']
@@ -121,7 +122,8 @@ class MicroAdam(torch.optim.Optimizer):
                 if p is None:
                     continue
 
-                ng, nu, ne, sp_u = self.update_step(p, lr, wd)
+                nqe, ng, nu, ne, sp_u = self.update_step(p, lr, wd)
+                norm_qe += nqe
                 norm_g += ng
                 norm_u += nu
                 norm_e += ne
@@ -130,13 +132,13 @@ class MicroAdam(torch.optim.Optimizer):
         # torch.cuda.synchronize()
         time_end = time.time()
         elapsed_step = time_end - time_start
-        self._log(norm_g, norm_u, norm_e, sparsity_u, elapsed_step)
+        self._log(norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step)
 
         return loss
 
     @torch.no_grad()
     def update_step(self, p, lr, wd):
-        norm_g, norm_u, norm_e, sp_u = 0, 0, 0, 0
+        norm_qe, norm_g, norm_u, norm_e, sp_u = 0, 0, 0, 0, 0
 
         grad = p.grad.view(-1)
 
@@ -149,6 +151,7 @@ class MicroAdam(torch.optim.Optimizer):
 
         # print('rank=',torch.distributed.get_rank(), 'keys=',st.keys())
 
+        quant_err = st['quant_err']
         blocks = st['blocks']
         # lr = st['lr']
         # wd = st['weight_decay']
@@ -235,6 +238,8 @@ class MicroAdam(torch.optim.Optimizer):
             #               = theta_t - lr * a_t              # STEP A below, in this if statmenet
             #                         + lr * Qinv(e_t+1)      # STEP B below, in this if statmenet
             #                         - lr * u_t              # this is steps 10-11
+            quant_err.zero_()
+            quant_err.add_(p.grad)
 
             ##### STEP A
             p.add_(p.grad, alpha=-lr)
@@ -244,6 +249,9 @@ class MicroAdam(torch.optim.Optimizer):
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1)
             p.add_(p.grad, alpha=lr)
 
+            quant_err.sub_(p.grad)
+
+            norm_qe = quant_err.norm(p=2) ** 2
 
         ##### STEPS 10-11
         grad.zero_()
@@ -296,19 +304,20 @@ class MicroAdam(torch.optim.Optimizer):
 
             norm_e = grad.norm(p=2) ** 2
 
-        return norm_g, norm_u, norm_e, sp_u
+        return norm_qe, norm_g, norm_u, norm_e, sp_u
 
-    def _log(self, norm_g, norm_u, norm_e, sparsity_u, elapsed_step):
+    def _log(self, norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step):
         if self.steps % self.log_interval == 0:
-            sync_data = torch.tensor([norm_g, norm_u, norm_e, sparsity_u, elapsed_step], dtype=torch.float,
+            sync_data = torch.tensor([norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step], dtype=torch.float,
                                      requires_grad=False).cuda()  # correct, loss, size
             all_reduce(sync_data, op=ReduceOp.SUM)
-            norm_g, norm_u, norm_e, sparsity_u, elapsed_step = sync_data
+            norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step = sync_data
 
             if not is_initialized() or get_rank() == 0:
                 wandb_data = {
                     'step/optimizer_steps': self.steps,
                     'step/gpu_mem_usage': get_gpu_mem_usage(),
+                    'step/quant_err_norm': math.sqrt(norm_qe),
                     'step/norm_g': math.sqrt(norm_g),
                     'step/norm_u': math.sqrt(norm_u),
                     'step/norm_error': math.sqrt(norm_e),
