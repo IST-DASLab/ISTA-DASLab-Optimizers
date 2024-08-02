@@ -233,13 +233,14 @@ class MicroAdam(torch.optim.Optimizer):
             #     - error is e_t+1 (from step 8 in algorithm 1)
             #
             # Below we have the formula to update the model parameters:
-            # 1) with lr
+            # [a = -1] with lr
             #     theta_t+1 = theta_t - lr * (a_t - Qinv(e_t+1)) - lr * u_t
             #               = theta_t - lr * a_t + lr * Qinv(e_t+1) - lr * u_t
             #               = theta_t - lr * a_t              # STEP A below, in this if statmenet
             #                         + lr * Qinv(e_t+1)      # STEP B below, in this if statmenet
             #                         - lr * u_t              # this is steps 10-11
             #
+            # [a = -2] without lr
             #     theta_t+1 = theta_t - (a_t - Qinv(e_t+1)) - lr * u_t
             #               = theta_t - a_t + lr * Qinv(e_t+1) - lr * u_t
             #               = theta_t - a_t              # STEP A below, in this if statmenet
