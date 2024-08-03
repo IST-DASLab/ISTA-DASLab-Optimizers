@@ -318,10 +318,11 @@ class MicroAdam(torch.optim.Optimizer):
 
     def _log(self, norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step):
         if self.steps % self.log_interval == 0:
-            sync_data = torch.tensor([norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step], dtype=torch.float,
-                                     requires_grad=False).cuda()  # correct, loss, size
-            all_reduce(sync_data, op=ReduceOp.SUM)
-            norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step = sync_data
+            if is_initialized():
+                sync_data = torch.tensor([norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step], dtype=torch.float,
+                                         requires_grad=False).cuda()  # correct, loss, size
+                all_reduce(sync_data, op=ReduceOp.SUM)
+                norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step = sync_data
 
             if not is_initialized() or get_rank() == 0:
                 wandb_data = {
