@@ -109,7 +109,7 @@ class MicroAdam(torch.optim.Optimizer):
 
         time_start = time.time()
 
-        norm_qe, norm_g, norm_u, norm_e, sparsity_u = 0, 0, 0, 0, 0
+        norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe = 0, 0, 0, 0, 0, 0
 
         for group in self.param_groups:
             lr = group['lr']
@@ -122,23 +122,24 @@ class MicroAdam(torch.optim.Optimizer):
                 if p is None:
                     continue
 
-                nqe, ng, nu, ne, sp_u = self.update_step(p, lr, wd)
+                nqe, ng, nu, ne, sp_u, sp_qe = self.update_step(p, lr, wd)
                 norm_qe += nqe
                 norm_g += ng
                 norm_u += nu
                 norm_e += ne
                 sparsity_u += sp_u
+                sparsity_qe += sp_qe
 
         # torch.cuda.synchronize()
         time_end = time.time()
         elapsed_step = time_end - time_start
-        self._log(norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step)
+        self._log(norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step)
 
         return loss
 
     @torch.no_grad()
     def update_step(self, p, lr, wd):
-        norm_qe, norm_g, norm_u, norm_e, sp_u = 0, 0, 0, 0, 0
+        norm_qe, norm_g, norm_u, norm_e, sp_u, sp_qe = 0, 0, 0, 0, 0, 0
 
         grad = p.grad.view(-1)
 
@@ -260,6 +261,7 @@ class MicroAdam(torch.optim.Optimizer):
             quant_err.sub_(p.grad)
 
             norm_qe = quant_err.norm(p=2) ** 2
+            sp_qe = (quant_err == 0).sum()
 
         ##### STEPS 10-11
         grad.zero_()
@@ -312,20 +314,21 @@ class MicroAdam(torch.optim.Optimizer):
 
             norm_e = grad.norm(p=2) ** 2
 
-        return norm_qe, norm_g, norm_u, norm_e, sp_u
+        return norm_qe, norm_g, norm_u, norm_e, sp_u, sp_qe
 
-    def _log(self, norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step):
+    def _log(self, norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step):
         if self.steps % self.log_interval == 0:
-            sync_data = torch.tensor([norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step], dtype=torch.float,
+            sync_data = torch.tensor([norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step], dtype=torch.float,
                                      requires_grad=False).cuda()  # correct, loss, size
             all_reduce(sync_data, op=ReduceOp.SUM)
-            norm_qe, norm_g, norm_u, norm_e, sparsity_u, elapsed_step = sync_data
+            norm_qe, norm_g, norm_u, norm_e, sparsity_u, sparsity_qe, elapsed_step = sync_data
 
             if not is_initialized() or get_rank() == 0:
                 wandb_data = {
                     'step/optimizer_steps': self.steps,
                     'step/gpu_mem_usage': get_gpu_mem_usage(),
-                    'step/quant_err_norm': math.sqrt(norm_qe),
+                    'step/norm_quant_err': math.sqrt(norm_qe),
+                    'step/sparsity_quant_err': sparsity_qe / self.model_size * 100.,
                     'step/norm_g': math.sqrt(norm_g),
                     'step/norm_u': math.sqrt(norm_u),
                     'step/norm_error': math.sqrt(norm_e),
