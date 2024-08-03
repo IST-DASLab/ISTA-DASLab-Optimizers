@@ -28,7 +28,7 @@ class MicroAdam(torch.optim.Optimizer):
         self.eps = eps
 
         self.densify_update_using_ef = (self.alpha > 0)
-        self.densify_update_using_quant_error = (self.alpha == -1)
+        self.densify_update_using_quant_error = (self.alpha == -2)
 
         self.model_size = sum([p.numel() for group in self.param_groups for p in group['params']])
 
