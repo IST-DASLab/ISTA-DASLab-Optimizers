@@ -43,8 +43,12 @@ class MicroAdam(torch.optim.Optimizer):
         self.max_floats = ista_daslab_tools.get_max_floats_for_shared_memory_per_thread_block()
         self.d_block_size = self.max_floats // 2 // int(100 / self.shared_memory_carveout)
 
-        self.fsdp_dict_size_count = [{} for _ in range(
-            torch.distributed.get_world_size())]  # key = layer size, value = how many layers of that size the model has (per worker)
+        if torch.distributed.is_initialized():
+            self.fsdp_dict_size_count = [{} for _ in range(
+                torch.distributed.get_world_size())]  # key = layer size, value = how many layers of that size the model has (per worker)
+        else:
+            self.fsdp_dict_size_count = [{}]
+
         self.dict_size_count = {}  # key = layer size, value = how many layers of that size the model has
         for param in self.param_groups:
             for p in param['params']:
@@ -58,7 +62,7 @@ class MicroAdam(torch.optim.Optimizer):
         layer_size = p.numel()
         st = self.state[p]
 
-        rank = torch.distributed.get_rank()
+        rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
 
         st['quant_err'] = torch.zeros_like(p)
         st['blocks'] = max(1, int(math.floor(self.blocks * layer_size * self.fsdp_dict_size_count[rank][layer_size] / self.model_size)))
@@ -99,7 +103,7 @@ class MicroAdam(torch.optim.Optimizer):
                 loss = closure()
 
         if self.steps == 1:
-            rank = torch.distributed.get_rank()
+            rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
             for param in self.param_groups:
                 for p in param['params']:
                     if p is not None:
@@ -141,7 +145,10 @@ class MicroAdam(torch.optim.Optimizer):
     def update_step(self, p, lr, wd):
         norm_qe, norm_g, norm_u, norm_e, sp_u, sp_qe = 0, 0, 0, 0, 0, 0
 
-        grad = p.grad.view(-1)
+        if p.grad.dtype != torch.bfloat16:
+            grad = p.grad.to(dtype=torch.bfloat16).reshape(-1)
+        else:
+            grad = p.grad.view(-1)
 
         if self.steps % self.log_interval == 0:
             norm_g = grad.norm(p=2) ** 2
@@ -313,6 +320,8 @@ class MicroAdam(torch.optim.Optimizer):
             ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0)
 
             norm_e = grad.norm(p=2) ** 2
+
+        # p.grad = p.grad.to(dtype=original_grad_type)
 
         return norm_qe, norm_g, norm_u, norm_e, sp_u, sp_qe
 
