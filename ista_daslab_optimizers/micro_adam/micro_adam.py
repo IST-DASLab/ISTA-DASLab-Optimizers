@@ -64,7 +64,9 @@ class MicroAdam(torch.optim.Optimizer):
 
         rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
 
-        st['quant_err'] = torch.zeros_like(p)
+        if self.densify_update_using_quant_error:
+            st['quant_err'] = torch.zeros_like(p)
+
         st['blocks'] = max(1, int(math.floor(self.blocks * layer_size * self.fsdp_dict_size_count[rank][layer_size] / self.model_size)))
 
         st['lr'] = lr
@@ -159,7 +161,6 @@ class MicroAdam(torch.optim.Optimizer):
 
         # print('rank=',torch.distributed.get_rank(), 'keys=',st.keys())
 
-        quant_err = st['quant_err']
         blocks = st['blocks']
         # lr = st['lr']
         # wd = st['weight_decay']
@@ -254,6 +255,7 @@ class MicroAdam(torch.optim.Optimizer):
             #               = theta_t - a_t              # STEP A below, in this if statmenet
             #                         + Qinv(e_t+1)      # STEP B below, in this if statmenet
             #                         - lr * u_t              # this is steps 10-11
+            quant_err = st['quant_err']
             quant_err.zero_()
             quant_err.add_(p.grad)
 
