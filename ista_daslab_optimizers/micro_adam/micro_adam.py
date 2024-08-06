@@ -145,10 +145,10 @@ class MicroAdam(torch.optim.Optimizer):
     def update_step(self, p, lr, wd):
         norm_qe, norm_g, norm_u, norm_e, sp_u, sp_qe = 0, 0, 0, 0, 0, 0
 
-        if p.grad.dtype != torch.bfloat16:
-            grad = p.grad.to(dtype=torch.bfloat16).reshape(-1)
-        else:
-            grad = p.grad.view(-1)
+        # if p.grad.dtype != torch.bfloat16:
+        #     grad = p.grad.to(dtype=torch.bfloat16).reshape(-1)
+        # else:
+        grad = p.grad.view(-1)
 
         if self.steps % self.log_interval == 0:
             norm_g = grad.norm(p=2) ** 2
