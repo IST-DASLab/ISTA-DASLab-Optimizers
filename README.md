@@ -64,6 +64,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.3** @ September 5th, 2024:
+  - allow using `SparseCoreMFACwithEF` separately by importing it in `sparse_mfac.__init__.py`
 - **1.1.2** @ August 1st, 2024:
   - ***[1.1.0]:*** added support to densify the final update: introduced parameter alpha that controls the fraction of error feedback
   (EF) to be integrated into the update to make it dense. Finally, the fraction alpha will be discarded from the EF at
