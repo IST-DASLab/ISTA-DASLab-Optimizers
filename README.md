@@ -66,6 +66,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.6** @ February 19th, 2025:
+  - do not update the parameters that have `None` gradient in method `update_model` from `tools.py`. This is useful when using M-FAC for models with more than one classification head in the Continual Learning framework
 - **1.1.5** @ February 19th, 2025:
   - adapted `DenseMFAC` for a model with multiple classification heads for Continual Learning where we have one feature extractor block and a list of classification heads. The issue was related to the model size, which included the feature extractor backbone and all classification heads, but in practice only one classification head will be used for training and inference. This caused some size mismatch errors at runtime in the `DenseCoreMFAC` module because the gradient at runtime had fewer entries than the entire model. When using `DenseMFAC` for such settings, set `optimizer.model_size` to the correct size after calling the constructor and the `DenseCoreMFAC` object will be created automatically in the `step` function.
 - **1.1.3** @ September 5th, 2024:
@@ -76,12 +78,9 @@ optimizer = MicroAdam(
   the expense of another call to `Qinv` and `Q` (and implicitly quantization statistics computation).
   - ***[1.0.2]:*** added FSDP-compatible implementation by initializing the parameter states in the `update_step` method
   instead of MicroAdam constructor
-
 - **1.0.1** @ June 27th, 2024:
   - removed version in dependencies to avoid conflicts with llm-foundry
-
 - **1.0.0** @ June 20th, 2024:
   - changed minimum required Python version to 3.8+ and torch to 2.3.0+
-
 - **0.0.1** @ June 13th, 2024:
   - added initial version of the package for Python 3.9+ and torch 2.3.1+

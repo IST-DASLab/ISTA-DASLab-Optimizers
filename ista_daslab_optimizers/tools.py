@@ -134,6 +134,8 @@ def update_model(params, update, weight_decay=0, alpha=None, multiply_wd_w_lr=Fa
         lr = group['lr']
         wd = group.get('weight_decay', weight_decay) # if the param groups do not have weight decay, then use the externally provided one
         for p in group['params']:
+            if p.grad is None:
+                continue
             u = update[count:(count + p.numel())].reshape(p.shape).to(p.device)
             if wd > 0:
                 if multiply_wd_w_lr:
