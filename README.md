@@ -17,11 +17,13 @@ The repository contains code for the following optimizers published by DASLab @ 
   - official repository: [GitHub](https://github.com/IST-DASLab/MicroAdam)
 
 ### Installation
-To use the latest stable version of the repository, you can install via pip:
+To use the latest stable version of this repository, you can install via pip:
 
 ```shell
 pip3 install ista-daslab-optimizers
 ```
+
+and you can also visit the [PyPi page](https://pypi.org/project/ista-daslab-optimizers/).
 
 We also provide a script `install.sh` that creates a new environment, installs requirements
 and then installs the project as a Python package following these steps:
@@ -64,6 +66,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.4** @ February 19th, 2025:
+  - adapted `DenseMFAC` for a model with multiple classification heads for Continual Learning where we have one feature extractor block and a list of classification heads. The issue was related to the model size, which included the feature extractor backbone and all classification heads, but in practice only one classification head will be used for training and inference. This caused some size mismatch errors at runtime in the `DenseCoreMFAC` module because the gradient at runtime had fewer entries than the entire model. When using `DenseMFAC` for such settings, set `optimizer.model_size` to the correct size after calling the constructor and the `DenseCoreMFAC` object will be created automatically in the `step` function.
 - **1.1.3** @ September 5th, 2024:
   - allow using `SparseCoreMFACwithEF` separately by importing it in `sparse_mfac.__init__.py`
 - **1.1.2** @ August 1st, 2024:

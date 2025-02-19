@@ -23,22 +23,23 @@ class DenseMFAC(torch.optim.Optimizer):
         self.damp = damp
         self.weight_decay = weight_decay
         self.device = get_first_device()
+        self.create_G = create_G
 
         self.model_size = None
         self.steps = 0
         self.wandb_data = dict()
 
-
-
         self.model_size = sum([p.numel() for group in self.param_groups for p in group['params']])
-        print(f'Model size: {self.model_size}')
 
+        self.hinv = None
+
+    def _create_hinv(self):
         self.hinv = DenseCoreMFAC(
-            grads=torch.zeros((ngrads, self.model_size), dtype=torch.float),
+            grads=torch.zeros((self.m, self.model_size), dtype=torch.float),
             dev=self.device,
             gpus=get_gpus(),
-            damp=damp,
-            create_G=create_G)
+            damp=self.damp,
+            create_G=self.create_G)
 
     @torch.no_grad()
     def empty_buffer(self):
@@ -69,6 +70,9 @@ class DenseMFAC(torch.optim.Optimizer):
     @torch.no_grad()
     def step(self, closure=None):
         self.steps += 1
+
+        if self.hinv is None:
+            self._create_hinv()
 
         g = get_weights_and_gradients(self.param_groups, get_weights=False)
         update = self.compute_update(g, g)
