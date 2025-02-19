@@ -45,16 +45,16 @@ torch::Tensor hinv_setup_cuda(torch::Tensor tmp, torch::Tensor coef) {
   const dim3 threads(SIZE, SIZE);
   const dim3 blocks(m / SIZE, m / SIZE);
 
-  AT_DISPATCH_FLOATING_TYPES(tmp.type(), "hinv_setup_cuda", ([&] {
+  AT_DISPATCH_FLOATING_TYPES(tmp.scalar_type(), "hinv_setup_cuda", ([&] {
       HinvCoefKernelDiag<scalar_t><<<m / SIZE, threads>>>(
-        m, tmp.data<scalar_t>(), coef.data<scalar_t>()
+        m, tmp.data_ptr<scalar_t>(), coef.data_ptr<scalar_t>()
       );
     })
   );
   for (int i = 0; i < m / SIZE - 1; i++) {
-    AT_DISPATCH_FLOATING_TYPES(tmp.type(), "hinv_setup_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(tmp.scalar_type(), "hinv_setup_cuda", ([&] {
         HinvCoefKernelMain<scalar_t><<<blocks, threads>>>(
-          m, tmp.data<scalar_t>(), coef.data<scalar_t>(), i 
+          m, tmp.data_ptr<scalar_t>(), coef.data_ptr<scalar_t>(), i
         );
       })
     );
@@ -178,9 +178,9 @@ __global__ void HinvMulKernel(
 // NOTE: currently only works for `m` <= 1024
 torch::Tensor hinv_mul_cuda(int rows, torch::Tensor giHig, torch::Tensor giHix) {
   const auto m = giHig.size(0);
-  AT_DISPATCH_FLOATING_TYPES(giHig.type(), "hinv_mul_cuda", ([&] {
+  AT_DISPATCH_FLOATING_TYPES(giHig.scalar_type(), "hinv_mul_cuda", ([&] {
       HinvMulKernel<scalar_t><<<1, m>>>(
-        rows, m, giHig.data<scalar_t>(), giHix.data<scalar_t>()
+        rows, m, giHig.data_ptr<scalar_t>(), giHix.data_ptr<scalar_t>()
       );
     })
   );
