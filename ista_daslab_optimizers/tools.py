@@ -215,3 +215,4 @@ class KernelVersionsManager:
 
     def get_LCG_threads(self):
         return self.LCG_BLOCKS_THREADS[self.version_LCG][self.THREAD_INDEX]
+
