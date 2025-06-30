@@ -66,6 +66,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.7 (not build yet)** @ June 30th, 2025:
+  - added only the code for `ScionedSOAP` and `CustomEmaAdamW`, as well as the ncessary utils for them
 - **1.1.6** @ February 19th, 2025:
   - do not update the parameters that have `None` gradient in method `update_model` from `tools.py`. This is useful when using M-FAC for models with more than one classification head in the Continual Learning framework
 - **1.1.5** @ February 19th, 2025:
