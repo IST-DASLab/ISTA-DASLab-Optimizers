@@ -15,6 +15,9 @@ The repository contains code for the following optimizers published by DASLab @ 
 - **MicroAdam**:
   - paper: [MicroAdam: Accurate Adaptive Optimization with Low Space Overhead and Provable Convergence](https://arxiv.org/abs/2405.15593)
   - official repository: [GitHub](https://github.com/IST-DASLab/MicroAdam)
+- **Trion / DCT-AdamW**:
+  - paper: [FFT-based Dynamic Subspace Selection for Low-Rank Adaptive Optimization of Large Language Models](https://arxiv.org/abs/2505.17967v3)
+  - code: [GitHub](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers/tree/main/ista_daslab_optimizers/fft_low_rank)
 
 ### Installation
 To use the latest stable version of this repository, you can install via pip:
@@ -36,7 +39,8 @@ source install.sh
 
 ## How to use optimizers?
 
-In this repository we provide a minimal working example for CIFAR-10 for optimizers `acdc`, `dense_mfac`, `sparse_mfac` and `micro_adam`:
+In this repository we provide a minimal working example for CIFAR-10 for optimizers `acdc`,
+`dense_mfac`, `sparse_mfac` and `micro_adam`:
 ```shell
 cd examples/cifar10
 OPTIMIZER=micro_adam # or any other optimizer listed above
@@ -66,20 +70,29 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
-- **1.1.7 (not build yet)** @ June 30th, 2025:
-  - added only the code for `ScionedSOAP` and `CustomEmaAdamW`, as well as the ncessary utils for them
+- **1.1.7** @ October 8th, 2025:
+  - added code for `Trion & DCT-AdamW`
 - **1.1.6** @ February 19th, 2025:
-  - do not update the parameters that have `None` gradient in method `update_model` from `tools.py`. This is useful when using M-FAC for models with more than one classification head in the Continual Learning framework
+  - do not update the parameters that have `None` gradient in method `update_model` from `tools.py`.
+  This is useful when using M-FAC for models with more than one classification head in the Continual Learning framework.
 - **1.1.5** @ February 19th, 2025:
-  - adapted `DenseMFAC` for a model with multiple classification heads for Continual Learning where we have one feature extractor block and a list of classification heads. The issue was related to the model size, which included the feature extractor backbone and all classification heads, but in practice only one classification head will be used for training and inference. This caused some size mismatch errors at runtime in the `DenseCoreMFAC` module because the gradient at runtime had fewer entries than the entire model. When using `DenseMFAC` for such settings, set `optimizer.model_size` to the correct size after calling the constructor and the `DenseCoreMFAC` object will be created automatically in the `step` function.
+  - adapted `DenseMFAC` for a model with multiple classification heads for Continual Learning where 
+  we have one feature extractor block and a list of classification heads. The issue was related to
+  the model size, which included the feature extractor backbone and all classification heads, but
+  in practice only one classification head will be used for training and inference. This caused some
+  size mismatch errors at runtime in the `DenseCoreMFAC` module because the gradient at runtime had
+  fewer entries than the entire model. When using `DenseMFAC` for such settings, set `optimizer.model_size`
+  to the correct size after calling the constructor and the `DenseCoreMFAC` object will be created
+  automatically in the `step` function.
 - **1.1.3** @ September 5th, 2024:
   - allow using `SparseCoreMFACwithEF` separately by importing it in `sparse_mfac.__init__.py`
 - **1.1.2** @ August 1st, 2024:
-  - ***[1.1.0]:*** added support to densify the final update: introduced parameter alpha that controls the fraction of error feedback
-  (EF) to be integrated into the update to make it dense. Finally, the fraction alpha will be discarded from the EF at
-  the expense of another call to `Qinv` and `Q` (and implicitly quantization statistics computation).
-  - ***[1.0.2]:*** added FSDP-compatible implementation by initializing the parameter states in the `update_step` method
-  instead of MicroAdam constructor
+  - ***[1.1.0]:*** added support to densify the final update: introduced parameter alpha that controls
+  the fraction of error feedback (EF) to be integrated into the update to make it dense. Finally, the
+  fraction alpha will be discarded from the EF at the expense of another call to `Qinv` and `Q` (and
+  implicitly quantization statistics computation). 
+  - ***[1.0.2]:*** added FSDP-compatible implementation by initializing the parameter states in the
+  `update_step` method instead of MicroAdam constructor
 - **1.0.1** @ June 27th, 2024:
   - removed version in dependencies to avoid conflicts with llm-foundry
 - **1.0.0** @ June 20th, 2024:
