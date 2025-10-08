@@ -1,7 +1,7 @@
 import torch
 import torch.distributed as dist
-from ..utils.dct import dct_type2_makhoul
-from ..utils.global_cache import GlobalCache
+from ista_daslab_optimizers.utils.dct import dct_type2_makhoul
+from ista_daslab_optimizers.utils.global_cache import GlobalCache
 
 class FFTLowRankProjector:
     def __init__(self, p, rank, proj, rotate_subspace, sim_type='matmul', ell_norm=1, use_th_sim=False):

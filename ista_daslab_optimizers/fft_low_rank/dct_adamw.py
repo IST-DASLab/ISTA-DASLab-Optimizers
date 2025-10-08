@@ -1,34 +1,22 @@
 import torch
+import torch.distributed as dist
+
 import math
 import numpy as np
-import torch.distributed as dist
+
 from fast_hadamard_transform import hadamard_transform
-from optimizers.adam.low_rank.dct import _init_dct3_transform
-from ..utils.quantizers import Quantizer4bit, Quantizer8bit
-from optimizers.adam.low_rank.clr_projector import FFTLowRankProjector
-
-# STRATEGY_FIRST = 'first'
-STRATEGY_TOPK_LARGEST = 'topk-largest'
-# STRATEGY_TOPK_SMALLEST = 'topk-smallest'
-# STRATEGY_RANDOM = 'random'
-# STRATEGY_WINDOW = 'window'
-
-ALL_STRATEGIES = [
-    # STRATEGY_FIRST, # choose first `r` columns
-    STRATEGY_TOPK_LARGEST,
-    # STRATEGY_TOPK_SMALLEST,
-    # STRATEGY_RANDOM,
-    # STRATEGY_WINDOW,
-]
+from ista_daslab_optimizers.utils.dct import dct3_matrix
+from ista_daslab_optimizers.utils.quantizers import Quantizer4bit, Quantizer8bit
+from ista_daslab_optimizers.fft_low_rank.fft_projector import FFTLowRankProjector
 
 PROJ_DCT = 'dct'
 PROJ_HDM = 'hdm'
 PROJ_RAND_QR = 'rqr'
 
 ALL_PROJ = [
-    PROJ_DCT, # use the projection matrix from DCT
-    PROJ_HDM, # use the projection
-    PROJ_RAND_QR,
+    PROJ_DCT, # DCT projection
+    PROJ_HDM, # Hadamard projection
+    PROJ_RAND_QR, # Random-QR projection
 ]
 
 STATE_M = 'm'
@@ -49,7 +37,6 @@ class DCTAdamW(torch.optim.Optimizer):
                  weight_decay,
                  rank,
                  proj,
-                 # strategy,
                  use_ef=False,
                  q_ef=False,
                  distributed=False,
@@ -60,7 +47,6 @@ class DCTAdamW(torch.optim.Optimizer):
                  max_shape=32_000,
                  betas=(0.9, 0.999),
                  eps=1e-8):
-        # assert strategy in ALL_STRATEGIES
         assert proj in ALL_PROJ
 
         super().__init__(params, dict(lr=lr, weight_decay=weight_decay))
@@ -94,7 +80,7 @@ class DCTAdamW(torch.optim.Optimizer):
         if self.Q is None:
             size = min(p.shape)
             if self.proj == PROJ_DCT:
-                Qdct3 = _init_dct3_transform(size).to(device=p.device, dtype=p.dtype)  # first row is zero
+                Qdct3 = dct3_matrix(size, p.dtype, p.device)  # first row is zero
                 if self.sim_type == 'makhoul':
                     self.Q = Qdct3.t()
                     print(f'\n\t!!!!! Initialized DCT-2 matrix of size {size} !!!!!\n')
@@ -285,9 +271,9 @@ class DCTAdamW(torch.optim.Optimizer):
             if n >= self.max_shape or m >= self.max_shape:  # apply full-rank for parameters that have at least one dimension >= max_size (e.g. embeddings and lm_head)
                 self.adamw_step(p, lr)
             else:
-                self.cheap_low_rank_step(p, lr)
+                self.dct_low_rank_step(p, lr)
 
-    def cheap_low_rank_step(self, p, lr):
+    def dct_low_rank_step(self, p, lr):
         beta1, beta2 = self.betas
         bc1 = 1 - beta1 ** self.steps
         sqrt_bc2 = math.sqrt(1 - beta2 ** self.steps)

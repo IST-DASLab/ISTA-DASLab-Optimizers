@@ -1,7 +1,7 @@
 import torch
 import math
 
-from utils.global_cache import GlobalCache
+from ista_daslab_optimizers.utils.global_cache import GlobalCache
 
 def dct3_matrix(n, dtype, device):
     """
