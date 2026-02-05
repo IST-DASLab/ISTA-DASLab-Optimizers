@@ -70,6 +70,10 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.8** @ February 5th, 2026:
+  - moved kernels to [ISTA-DASLab-Optimizers-CUDA](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers-CUDA)
+  - building building the package after adding a new optimizer that doesn't require CUDA support would require compiling 
+  the kernels from scratch, which is time consuming and not needed
 - **1.1.7** @ October 8th, 2025:
   - added code for `Trion & DCT-AdamW`
 - **1.1.6** @ February 19th, 2025:

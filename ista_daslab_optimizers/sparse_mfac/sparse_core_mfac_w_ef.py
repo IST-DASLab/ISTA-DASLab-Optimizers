@@ -5,9 +5,9 @@ from ..tools import block_split, KernelVersionsManager, CopyDirection
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-import ista_daslab_tools
-import ista_daslab_dense_mfac
-import ista_daslab_sparse_mfac
+import ista_daslab_cuda_tools
+import ista_daslab_cuda_dense_mfac
+import ista_daslab_cuda_sparse_mfac
 
 USE_CUDA = True
 
@@ -28,7 +28,7 @@ class SparseCoreMFACwithEF:
         ##### Error Feedback & Top-K related methods
         self.error = torch.zeros(self.d, dtype=torch.bfloat16 if use_bf16 else torch.float32, device=self.device)
 
-        self.d_block_size = ista_daslab_tools.get_max_floats_for_shared_memory_per_thread_block()
+        self.d_block_size = ista_daslab_cuda_tools.get_max_floats_for_shared_memory_per_thread_block()
         self.k_block_size = math.ceil(self.d_block_size * self.k_init)
         self.blocks_count, self.start_index_of_last_block = block_split(self.d, self.d_block_size)
         self.k = self.k_block_size * self.blocks_count
@@ -77,7 +77,7 @@ class SparseCoreMFACwithEF:
 
         if USE_CUDA:
             diag_lambd = torch.diag(torch.full([self.m], self.lamda, device=self.device, dtype=self.dtype))
-            self.coef = ista_daslab_dense_mfac.hinv_setup(tmp, diag_lambd)
+            self.coef = ista_daslab_cuda_dense_mfac.hinv_setup(tmp, diag_lambd)
         else:
             for i in range(max(self.buffer_index, 1), self.m):
                 self.coef[i, :i] = tmp[i, :i].matmul(self.coef[:i, :i])
@@ -102,7 +102,7 @@ class SparseCoreMFACwithEF:
         ### copy the values from the error feedback accumulator to values V (this is the G update),
         ### the large tensor (error, size d) is copied to the small tensor (V, size k)
         # norm_last_v_1 = self.V[self.buffer_index, :].norm(p=2).item()
-        ista_daslab_tools.copy_values(self.d,  # V = error[I[buffer_index, :]]
+        ista_daslab_cuda_tools.copy_values(self.d,  # V = error[I[buffer_index, :]]
                                       self.k,
                                       self.d_block_size,
                                       self.k_block_size,
@@ -114,7 +114,7 @@ class SparseCoreMFACwithEF:
         ### the small tensor (V, size k) is copied to the large tensor (g, size d)
         g.zero_() # this will contain the values in V, at the right indices, but will also contain zeros
         # norm_g_before = g.norm(p=2).item()
-        ista_daslab_tools.copy_values(self.d,  # this does g[I[buffer_index]] = V
+        ista_daslab_cuda_tools.copy_values(self.d,  # this does g[I[buffer_index]] = V
                                       self.k,
                                       self.d_block_size,
                                       self.k_block_size,
@@ -169,7 +169,7 @@ class SparseCoreMFACwithEF:
             dots = self.compute_scalar_products(g)
         giHix = self.lamda * dots
         if USE_CUDA:
-            giHix = ista_daslab_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
+            giHix = ista_daslab_cuda_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
             torch.cuda.synchronize()
         else:
             for i in range(1, self.m):
@@ -185,7 +185,7 @@ class SparseCoreMFACwithEF:
     def compute_scalar_products(self, g):
         self.scalar_products.zero_()
 
-        ista_daslab_sparse_mfac.SP(
+        ista_daslab_cuda_sparse_mfac.SP(
             self.kvm.get_SP_blocks(),
             self.kvm.get_SP_threads(),
             self.kvm.version_SP,
@@ -205,7 +205,7 @@ class SparseCoreMFACwithEF:
     def compute_linear_combination(self, M, out):
         out.zero_()
 
-        ista_daslab_sparse_mfac.LCG(
+        ista_daslab_cuda_sparse_mfac.LCG(
             self.kvm.get_LCG_blocks(),
             self.kvm.get_LCG_threads(),
             self.kvm.version_LCG,

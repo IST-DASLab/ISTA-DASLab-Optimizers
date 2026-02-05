@@ -3,7 +3,7 @@ import gpustat
 import torch
 from enum import Enum
 from importlib import import_module
-import ista_daslab_tools
+import ista_daslab_cuda_tools
 
 def get_cuda_capability(device=0):
     cc = torch.cuda.get_device_capability(device) # tuple, for example (8, 6) for CUDA Capability 8.6
@@ -194,7 +194,7 @@ class KernelVersionsManager:
 
         if op_blocks_threads[op_version][self.BLOCK_INDEX] is None:
             blocks_count = div_inc(self.d, self.d_block_size)
-            op_max_blocks = ista_daslab_tools.get_sm_count()
+            op_max_blocks = ista_daslab_cuda_tools.get_sm_count()
             op_required_blocks = min(blocks_count, op_max_blocks)
             if op_required_blocks < op_max_blocks:
                 print(f'Maximum number of blocks for {op} is {op_max_blocks}, but this model requires only {op_required_blocks}')

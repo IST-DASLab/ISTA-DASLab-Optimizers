@@ -4,10 +4,10 @@ import numpy as np
 
 USE_CUDA = True
 try:
-    import ista_daslab_dense_mfac
+    import ista_daslab_cuda_dense_mfac
 except Exception as e:
     USE_CUDA = False
-    print('\n\t[WARNING] The module "ista_daslab_dense_mfac" is not installed, using slower PyTorch implementation!\n')
+    print('\n\t[WARNING] The module "ista_daslab_cuda_dense_mfac" is not installed, using slower PyTorch implementation!\n')
 
 class DenseCoreMFAC:
     def __init__(self, grads, dev, gpus, damp=1e-5, create_G=False):
@@ -76,7 +76,7 @@ class DenseCoreMFAC:
 
         if USE_CUDA:
             diag = torch.diag(torch.full(size=[self.m], fill_value=self.lambd, device=self.dev, dtype=self.dtype))
-            self.coef = ista_daslab_dense_mfac.hinv_setup(tmp, diag)
+            self.coef = ista_daslab_cuda_dense_mfac.hinv_setup(tmp, diag)
         else:
             for i in range(max(self.last, 1), self.m):
                 self.coef[i, :i] = tmp[i, :i].matmul(self.coef[:i, :i])
@@ -130,7 +130,7 @@ class DenseCoreMFAC:
             dots = self.compute_scalar_products(x)
         giHix = self.lambd * dots
         if USE_CUDA:
-            giHix = ista_daslab_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
+            giHix = ista_daslab_cuda_dense_mfac.hinv_mul(self.m, self.giHig, giHix)
         else:
             for i in range(1, self.m):
                 giHix[i:].sub_(self.giHig[i - 1, i:], alpha=giHix[i - 1] / self.denom[i - 1])

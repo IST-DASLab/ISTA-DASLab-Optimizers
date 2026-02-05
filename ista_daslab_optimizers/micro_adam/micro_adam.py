@@ -6,8 +6,8 @@ import wandb
 from torch.distributed import is_initialized, get_rank, all_reduce, ReduceOp
 from ..tools import get_first_device, get_gpu_mem_usage, block_split, CopyDirection
 
-import ista_daslab_tools
-import ista_daslab_micro_adam
+import ista_daslab_cuda_tools
+import ista_daslab_cuda_micro_adam
 
 
 class MicroAdam(torch.optim.Optimizer):
@@ -37,10 +37,10 @@ class MicroAdam(torch.optim.Optimizer):
         self.device = get_first_device()
         self._is_state_initialized = False
         self.shared_memory_carveout = 100
-        self.blocks = ista_daslab_tools.get_sm_count() * int(100 / self.shared_memory_carveout)
+        self.blocks = ista_daslab_cuda_tools.get_sm_count() * int(100 / self.shared_memory_carveout)
         self.threads = 512
 
-        self.max_floats = ista_daslab_tools.get_max_floats_for_shared_memory_per_thread_block()
+        self.max_floats = ista_daslab_cuda_tools.get_max_floats_for_shared_memory_per_thread_block()
         self.d_block_size = self.max_floats // 2 // int(100 / self.shared_memory_carveout)
 
         if torch.distributed.is_initialized():
@@ -187,7 +187,7 @@ class MicroAdam(torch.optim.Optimizer):
         max_vals = st['max_vals']
 
         ##### STEP 4
-        ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0) # alpha=1 here
+        ista_daslab_cuda_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0) # alpha=1 here
 
         ##### STEP 5 + 9 (only for I)
         I[index, :k_index] = torch.topk(input=grad[0:d_index_topk].abs().view(topk_full_blocks_count, d_block_size),
@@ -199,7 +199,7 @@ class MicroAdam(torch.optim.Optimizer):
                                             k=k_block_size_few,  # example: slice has size 1, but ks[-1] is 4
                                             sorted=False).indices.to(dtype=torch.int16).view(-1)
 
-        ista_daslab_tools.copy_values(d,  # V = error[I[buffer_index, :]]
+        ista_daslab_cuda_tools.copy_values(d,  # V = error[I[buffer_index, :]]
                                       k,
                                       d_block_size,
                                       k_block_size_many,
@@ -211,7 +211,7 @@ class MicroAdam(torch.optim.Optimizer):
         st['index'] = (index + 1) % self.m
 
         ##### STEP 6
-        ista_daslab_tools.zerorize_block_components(grad, I[index, :], d, k, d_block_size, k_block_size_many)  # this does a[I[index]] = 0
+        ista_daslab_cuda_tools.zerorize_block_components(grad, I[index, :], d, k, d_block_size, k_block_size_many)  # this does a[I[index]] = 0
 
         ##### STEP 7
         def _update_quantization_statistics():
@@ -228,7 +228,7 @@ class MicroAdam(torch.optim.Optimizer):
         _update_quantization_statistics()
 
         ##### STEP 8
-        ista_daslab_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad)  # error = Q(a, min, max)
+        ista_daslab_cuda_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad)  # error = Q(a, min, max)
 
         # weight decay step
         if wd > 0:
@@ -264,7 +264,7 @@ class MicroAdam(torch.optim.Optimizer):
 
             ##### STEP B
             p.grad.zero_() # zerorize to prepare the accumulator for Qinv
-            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1)
+            ista_daslab_cuda_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1)
             p.add_(p.grad)
 
             quant_err.sub_(p.grad)
@@ -274,7 +274,7 @@ class MicroAdam(torch.optim.Optimizer):
 
         ##### STEPS 10-11
         grad.zero_()
-        ista_daslab_micro_adam.compute_microadam_update(blocks,  # blocks
+        ista_daslab_cuda_micro_adam.compute_microadam_update(blocks,  # blocks
                                                         self.threads,  # threads
                                                         self.shared_memory_carveout,  # carveout
                                                         self.steps,  # optimization step
@@ -295,7 +295,7 @@ class MicroAdam(torch.optim.Optimizer):
         ##### if PRETRAINING #1
         if self.densify_update_using_ef: # we add alpha * EF to update that is stored in grad buffer
             # p.grad += alpha * Qinv(error), alpha=0.1
-            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, self.alpha)
+            ista_daslab_cuda_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, self.alpha)
         ##### END IF PRETRAINING #1
 
         # if alpha > 0, then the update u=p.grad is dense now
@@ -310,16 +310,16 @@ class MicroAdam(torch.optim.Optimizer):
         ##### if PRETRAINING #2
         if self.densify_update_using_ef:
             grad.zero_()
-            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1-self.alpha)
+            ista_daslab_cuda_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1-self.alpha)
 
             _update_quantization_statistics() # step 7 again
-            ista_daslab_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad) # step 8 again
+            ista_daslab_cuda_micro_adam.asymm_block_quant(d, self.quant_block_size, error, min_vals, max_vals, grad) # step 8 again
         ##### END IF PRETRAINING #2
 
         # compute error norm
         if self.steps % self.log_interval == 0:
             grad.zero_()
-            ista_daslab_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0)
+            ista_daslab_cuda_micro_adam.asymm_block_quant_inv(d, self.quant_block_size, error, min_vals, max_vals, grad, 1.0)
 
             norm_e = grad.norm(p=2) ** 2
 
