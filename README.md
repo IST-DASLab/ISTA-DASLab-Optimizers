@@ -22,6 +22,10 @@ The repository contains code for the following optimizers published by DASLab @ 
   - paper: [DASH: Faster Shampoo via Batched Block Preconditioning and Efficient Inverse-Root Solvers](https://arxiv.org/pdf/2602.02016)
   - code: [GitHub](https://github.com/IST-DASLab/DASH)
 
+## CUDA Kernels
+Please visit the repository [ISTA-DASLab-Optimizers-CUDA](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers-CUDA) containing the CUDA 
+support for **M-FAC**, **Sparse M-FAC** and **MicroAdam** optimizers.
+
 ### Installation
 To use the latest stable version of this repository, you can install via pip:
 
