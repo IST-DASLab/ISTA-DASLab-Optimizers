@@ -15,6 +15,7 @@ dependencies = [
     "timm", # >=1.0.3",
     "einops", # >=0.7.0",
     "psutil", # >=5.9.8",
+    "triton", # for Dion kernels
     "ista-daslab-optimizers-cuda",
 #    "fast-hadamard-transform @ git+https://github.com/Dao-AILab/fast-hadamard-transform.git",
 ]

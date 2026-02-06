@@ -7,6 +7,7 @@ class ISTAOptimizer(torch.optim.Optimizer):
         self.lr = lr
         self.weight_decay = weight_decay
         self.optim_steps = 0
+        self.is_state_initialized = False
 
     def loop_params(self, check_grad=True):
         for group in self.param_groups:
