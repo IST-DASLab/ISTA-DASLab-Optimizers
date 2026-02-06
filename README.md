@@ -18,6 +18,9 @@ The repository contains code for the following optimizers published by DASLab @ 
 - **Trion / DCT-AdamW**:
   - paper: [FFT-based Dynamic Subspace Selection for Low-Rank Adaptive Optimization of Large Language Models](https://arxiv.org/abs/2505.17967v3)
   - code: [GitHub](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers/tree/main/ista_daslab_optimizers/fft_low_rank)
+- **DASH**:
+  - paper: [DASH: Faster Shampoo via Batched Block Preconditioning and Efficient Inverse-Root Solvers](https://arxiv.org/pdf/2602.02016)
+  - code: [GitHub](https://github.com/IST-DASLab/DASH)
 
 ### Installation
 To use the latest stable version of this repository, you can install via pip:
