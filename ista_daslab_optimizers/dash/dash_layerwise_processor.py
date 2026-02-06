@@ -357,15 +357,15 @@ class DashLayerwiseProcessor:
         inv_root_freq = cfg.inv_root_freq
         if t >= start_prec_step and (t == 1 or t % inv_root_freq == 0):
             ret = DashBlockRootInvertor.invert(Xin=self.LR, Xout=self.barLR, cfg=cfg, root=2 if self.is_norm_layer_stack else 4)
-            if ret is not None:
-                name = self.name
-                shape = tuple(self.param.shape)
-                wandb.log({ # TODO: THIS AFFECTS RUNNING TIME OF OPTIMIZER STEP, FIND A WAY TO LOG THIS INFO IN log_stats
-                    't': t,
-                    f'stats/{name}_{shape}_ranks_eig_vals_full': wandb.Histogram(self._wandbify(ret, op='vector')),
-                    f'stats/{name}_{shape}_ranks_eig_vals_full_min': ret.min().item(),
-                    f'stats/{name}_{shape}_ranks_eig_vals_full_max': ret.max().item(),
-                })
+            # if ret is not None:
+            #     name = self.name
+            #     shape = tuple(self.param.shape)
+            #     wandb.log({ # TODO: THIS AFFECTS RUNNING TIME OF OPTIMIZER STEP, FIND A WAY TO LOG THIS INFO IN log_stats
+            #         't': t,
+            #         f'stats/{name}_{shape}_ranks_eig_vals_full': wandb.Histogram(self._wandbify(ret, op='vector')),
+            #         f'stats/{name}_{shape}_ranks_eig_vals_full_min': ret.min().item(),
+            #         f'stats/{name}_{shape}_ranks_eig_vals_full_max': ret.max().item(),
+            #     })
 
     @torch.no_grad()
     def _update_grad_ema(self):
