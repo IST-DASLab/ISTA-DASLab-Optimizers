@@ -70,6 +70,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.9** @ February 6th, 2026:
+  - added **DASH** optimizer
 - **1.1.8** @ February 5th, 2026:
   - moved kernels to [ISTA-DASLab-Optimizers-CUDA](https://github.com/IST-DASLab/ISTA-DASLab-Optimizers-CUDA)
   - building building the package after adding a new optimizer that doesn't require CUDA support would require compiling 
