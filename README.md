@@ -70,6 +70,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.10** @ February 6th, 2026:
+  - removed **fast-hadamard-transform** because 1) it is not used and 2) it raises compilation errors during `pip install`
 - **1.1.9** @ February 6th, 2026:
   - added **DASH** optimizer
 - **1.1.8** @ February 5th, 2026:
