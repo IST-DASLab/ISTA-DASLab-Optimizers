@@ -3,11 +3,11 @@ import torch.distributed as dist
 from memory_efficient_optimizers.utils.dct import dct3_matrix
 
 PROJ_DCT = 'dct'
-PROJ_HDM = 'hdm'
+# PROJ_HDM = 'hdm'
 
 ALL_PROJ = [
     PROJ_DCT, # DCT projection
-    PROJ_HDM, # Hadamard projection
+    # PROJ_HDM, # Hadamard projection
 ]
 
 class MatrixStorage:
@@ -46,8 +46,8 @@ class MatrixStorage:
         if size not in self.storage:
             if proj == PROJ_DCT:
                 self.storage[size] = dct3_matrix(size).to(device=self.device, dtype=dtype) # first row is zero
-            elif proj == PROJ_HDM:
-                self.storage[size] = hadamard_transform(torch.eye(size).to(device=self.device, dtype=dtype), scale=1./math.sqrt(size))
+            # elif proj == PROJ_HDM:
+            #     self.storage[size] = hadamard_transform(torch.eye(size).to(device=self.device, dtype=dtype), scale=1./math.sqrt(size))
             else:
                 raise RuntimeError(f'Projection {proj} is currently not supported!')
 

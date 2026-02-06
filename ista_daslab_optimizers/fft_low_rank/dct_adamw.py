@@ -4,7 +4,7 @@ import torch.distributed as dist
 import math
 import numpy as np
 
-from fast_hadamard_transform import hadamard_transform
+# from fast_hadamard_transform import hadamard_transform
 from ista_daslab_optimizers.utils.dct import dct3_matrix
 from ista_daslab_optimizers.utils.quantizers import Quantizer4bit, Quantizer8bit
 from ista_daslab_optimizers.fft_low_rank.fft_projector import FFTLowRankProjector
@@ -89,9 +89,9 @@ class DCTAdamW(torch.optim.Optimizer):
                     print(f'\n\t!!!!! Initialized DCT-3 matrix of size {size} !!!!!\n')
                 else:
                     raise RuntimeError(f'Unknown sim_type: {self.sim_type}')
-            elif self.proj == PROJ_HDM:
-                self.Q = hadamard_transform(torch.eye(size).to(device=p.device, dtype=p.dtype), scale=1. / math.sqrt(size))
-                print(f'\n\t!!!!! Initialized Hadamard matrix of size {size} !!!!!\n')
+            # elif self.proj == PROJ_HDM:
+            #     self.Q = hadamard_transform(torch.eye(size).to(device=p.device, dtype=p.dtype), scale=1. / math.sqrt(size))
+            #     print(f'\n\t!!!!! Initialized Hadamard matrix of size {size} !!!!!\n')
             elif self.proj == PROJ_RAND_QR:
                 random = torch.randn(size, size, dtype=p.dtype, device=p.device)
                 self.Q, _ = torch.linalg.qr(random)
