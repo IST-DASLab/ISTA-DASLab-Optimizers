@@ -77,6 +77,10 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.12** @ February 15th, 2026:
+  - refactory for DASH: separated entities to different files and implemented **DashGpu**, as well as
+  a triton kernel to compute `L_t = beta * L_t-1 + (1-beta) * G @ G.T` and `R_t = beta * R_t-1 + (1-beta) * G.T @ G` in-place
+  using the stacked blocks.
 - **1.1.11** @ February 6th, 2026:
   - added `triton` as dependency
 - **1.1.10** @ February 6th, 2026:
