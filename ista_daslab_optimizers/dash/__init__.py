@@ -1,4 +1,4 @@
-from .dash_configs import *
 from .dash_layerwise import DashLayerwise
-from .dash_layerwise_processor import DashLayerwiseProcessor
-from .dash_layerwise_block_partitioner import DashLayerwiseBlockPartitioner
+from .dash_gpu import DashGpu
+from .dash_config import *
+from .types import *

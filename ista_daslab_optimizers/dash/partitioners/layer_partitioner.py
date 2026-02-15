@@ -1,56 +1,12 @@
-import enum
 import torch
 from torch import Tensor
-from dataclasses import dataclass
 from typing import Union
 
-@enum.unique
-class DashBlockInfo(enum.Enum):
-    REGULAR_BLOCK = enum.auto() # for 2D gradient
-    EFFICIENT_BLOCK_GROUPING_FULL_LR_NO_REST = enum.auto() # for LR without rest
-    EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_R_AND_REST_L = enum.auto() # for LR
-    EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_L_AND_REST_R = enum.auto() # for LR
-
-@dataclass
-class DashFakeTensorWithGrad:
-    """
-    This class is designed to simulate a torch.Tensor type with value p and gradient grad to be used in stacking the normalization
-    layers when updating them with Shampoo (AdaGrad). This should be compatible with ShampooLayerProcessor and BlockPartitioner
-    """
-    shape: None
-    dtype: None
-    device: None
-    ndim: None
-    p: None
-    grad: None
-
-    def __init__(self, shape, dtype, device):
-        self.shape = shape
-        self.dtype = dtype
-        self.device = device
-        self.ndim = 2
-
-        self.p = torch.zeros(shape, dtype=dtype, device=device, requires_grad=False)
-        # self.grad = torch.eros # I wrote this while thinking about buying Eros Pista haha
-        self.grad = torch.zeros_like(self.p)
-
-@dataclass
-class DashMatrixBlock:
-    full: Tensor = None
-    rest: Tensor = None
-    info: DashBlockInfo = None
-
-    def __init__(self, shape_full, shape_rest, info, dtype, device):
-        if shape_full is not None: self.full = torch.zeros(shape_full, dtype=dtype, device=device)
-        if shape_rest is not None: self.rest = torch.zeros(shape_rest, dtype=dtype, device=device)
-        if info is not None: self.info = info
-
-    @property
-    def has_rest(self):
-        return (self.rest is not None) and (isinstance(self.rest, Tensor))
+from ..types import DashPartitionInfo
+from ..tools import DashMatrixBlock, DashFakeParam
 
 
-class DashLayerwiseBlockPartitioner:
+class DashLayerPartitioner:
     """
     Partitions a matrix into blocks of size (B, B) when possible, and
     remainder blocks of size (B, b) or (b, B), with the assumption that
@@ -58,16 +14,16 @@ class DashLayerwiseBlockPartitioner:
     at most one type of remainder.
     """
 
-    def __init__(self, param: Union[Tensor, DashFakeTensorWithGrad], B: int, is_norm_layer_stack: bool):
+    def __init__(self, param: Union[Tensor, DashFakeParam], B: int, is_norm_layer_stack: bool):
         if isinstance(param, Tensor):
             assert not is_norm_layer_stack, \
-                'BlockPartitioner does not support param:Tensor and is_norm_layer_stack:True'
-        if isinstance(param, DashFakeTensorWithGrad):
+                'DashLayerwisePartitioner does not support param:Tensor and is_norm_layer_stack:True'
+        if isinstance(param, DashFakeParam):
             assert is_norm_layer_stack, \
-                'BlockPartitioner does not support param:FakeTensorWithGrad and is_norm_layer_stack:False'
+                'DashLayerwisePartitioner does not support param:DashFakeParam and is_norm_layer_stack:False'
         if is_norm_layer_stack:
             assert param.shape[1] % B == 0, \
-                'BlockPartitioner does not support block rests for stacked norm layers.'
+                'DashLayerwisePartitioner does not support block rests for stacked norm layers.'
         self.param = param
         self.B = B
         self.is_norm_layer_stack = is_norm_layer_stack
@@ -145,7 +101,7 @@ class DashLayerwiseBlockPartitioner:
         return DashMatrixBlock(
             shape_full=self.shape_full,
             shape_rest=self.shape_rest,
-            info=DashBlockInfo.REGULAR_BLOCK,
+            info=DashPartitionInfo.REGULAR_BLOCK,
             dtype=self.param.dtype,
             device=self.param.device)
 
@@ -224,7 +180,7 @@ class DashLayerwiseBlockPartitioner:
             - group L_full, R_full and R_rest into a single matrix called LRfull_Rrest = (62 x 2 + 2 = 126, 1024, 1024)
             - one matrix L_rest = (2, 256, 256)
 
-            This grouping can be encoded in a BlockInfo object as BlockInfo.FULL_LR_WITH_REST_R_THEN_REST_L, meaning:
+            This grouping can be encoded in a DashPartitionInfo object as DashPartitionInfo.FULL_LR_WITH_REST_R_THEN_REST_L, meaning:
             - type_LR_full_rest='R': we group matrices L_full, R_full (will always be the case) and the rest from R
             - type_rest='L': we simply keep the rest from L here
 
@@ -245,7 +201,7 @@ class DashLayerwiseBlockPartitioner:
             - group L_full, R_full and R_rest into a single matrix called LRfull_Lrest = (62 x 2 + 2 = 126, 1024, 1024)
             - one matrix R_rest = (2, 256, 256)
 
-            This grouping can be encoded in a BlockInfo object as BlockInfo.FULL_LR_WITH_REST_L_THEN_REST_R, meaning:
+            This grouping can be encoded in a DashPartitionInfo object as DashPartitionInfo.FULL_LR_WITH_REST_L_THEN_REST_R, meaning:
             - type_LR_full_rest='L': we group matrices L_full, R_full (will always be the case) and the rest from L
             - type_rest='R': we simply keep the rest from R here
 
@@ -278,7 +234,7 @@ class DashLayerwiseBlockPartitioner:
             # We don't use the special grouping flags for 1D, as there are no L/R factors
             return DashMatrixBlock(shape_full=final_shape_full,
                                    shape_rest=final_shape_rest,
-                                   info=DashBlockInfo.REGULAR_BLOCK,
+                                   info=DashPartitionInfo.REGULAR_BLOCK,
                                    dtype=self.param.dtype,
                                    device=self.param.device)
         # ------------------------------
@@ -287,14 +243,14 @@ class DashLayerwiseBlockPartitioner:
         if shape_rest is None:
             final_shape_full = (2 * shape_full[0], self.B, self.B)
             final_shape_rest = None
-            info = DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_NO_REST
+            info = DashPartitionInfo.NO_REST
         else:
             final_shape_full = (2 * shape_full[0] + shape_rest[0], self.B, self.B)
             if shape_rest[1] == self.B:
-                info = DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_L_AND_REST_R
+                info = DashPartitionInfo.REST_R
                 final_shape_rest = (shape_rest[0], shape_rest[2], shape_rest[2])
             elif shape_rest[2] == self.B:
-                info = DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_R_AND_REST_L
+                info = DashPartitionInfo.REST_L
                 final_shape_rest = (shape_rest[0], shape_rest[1], shape_rest[1])
 
         return DashMatrixBlock(shape_full=final_shape_full, shape_rest=final_shape_rest, info=info, dtype=self.param.dtype, device=self.param.device)

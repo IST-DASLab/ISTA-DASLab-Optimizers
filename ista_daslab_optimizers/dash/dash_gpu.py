@@ -2,16 +2,16 @@ import os
 import torch
 import torch.distributed as dist
 from typing_extensions import override
+from functools import partial
 
 from ..ista_optimizer import ISTAOptimizer
-from .types import *
 from .dash_config import DashConfig
-from .tools import DashFakeParam
-from .processors.layer_processor import DashLayerProcessor
+from .types import DashAlgoOneDim
+from .processors import DashGpuProcessor1D, DashGpuProcessor2D
 
-STATE_PROCESSOR = "shmp_layer_processor"
+STATE_PROCESSOR_2D = "dash_layer_processor_2D"
 
-class DashLayerwise(ISTAOptimizer):
+class DashGpu(ISTAOptimizer):
     """
         Features we implement from the DistributedShampoo paper https://arxiv.org/pdf/2309.06497"
 
@@ -44,10 +44,10 @@ class DashLayerwise(ISTAOptimizer):
         # assert len(param_groups) == 1, f'EfficientShampoo accepts only one parameter group that contains the entire optimization set'
         super().__init__(param_groups, lr=lr, weight_decay=weight_decay)
         self.config = config
-        self.norm_layers_stack = None # this will be an object of type FakeLayerWithGrad with shape (#num_norm_layers, embedding_size)
-        self.norm_layers_processor = None # this will be a custom object of type DashLayerProcessor that will process `norm_layers_stack`
+        self.dash_processor_1d: DashGpuProcessor1D = None # this will be a custom object of type DashLayerProcessor that will process all 1D layers
+        self.dash_processor_2d: DashGpuProcessor2D = None  # this will be a custom object of type DashLayerProcessor that will process all 2D layers
         """
-        This is a dictionary with:
+        self.buckets is a dictionary with:
         - key: GPU index 
         - value: a list of 3-tuple containing (group, state, param) that will be processed on the GPU index as value.
         This dictionary is created in a greedy manner by sorting all parameters by the total number of parameters and
@@ -56,9 +56,6 @@ class DashLayerwise(ISTAOptimizer):
         self.buckets = None # dict: key=rank, value=list with all parameters p updated on rank
         self.owners = None # dict: key=id(p), value=rank that updates the parameter p and which broadcast p to all other ranks
         self.numel_per_bucket = None # list: value at index i holds the total number of parameters processed by GPU #i
-
-        # self.ids_params_1d = None
-
         self.create_param_buckets()
 
     @torch.no_grad()
@@ -72,27 +69,16 @@ class DashLayerwise(ISTAOptimizer):
             rank = dist.get_rank()
             world_size = dist.get_world_size()
 
-            self.owners = {} # key = id(p), value = rank that will process the layer and will broadcast it to others
+            self.owners = {} # key = id(p), value = GPU rank
             self.buckets = {i: [] for i in range(world_size)}
-            self.numel_per_bucket = [0] * world_size
+            self.numel_per_bucket = [0] * world_size # position i stores how many parameters GPU #i has to process
 
-            # self.ids_params_1d = {i: [] for i in range(world_size)}
-
-            for index, group, state, p in params:
-                if p.ndim == 1: # 1D params will be processed locally by all ranks
+            for index, group, state, p in params: # iterate through the list of parameters sorted by number of elements
+                if p.ndim == 1: # 1D params will be splitted on all GPUs based on the GPU index
                     owner = index % world_size
                     self.owners[id(p)] = owner
                     if owner == rank:
                         self.buckets[rank].append((index, group, state, p))
-                        # self.ids_params_1d[rank].append(index)
-
-                    # self.owners[id(p)] = None # special marker
-                    # for r in range(world_size):
-                    #     self.buckets[rank].append((index, group, state, p))
-
-                    # # process all 1D params on the last GPUs that usually has the lowest load
-                    # self.buckets[world_size-1].append((index, group, state, p))
-                    # self.owners[id(p)] = world_size - 1
                 elif p.ndim == 2: # scatter 2D params across all ranks in a balanced way based on the number of params in numel_per_bucket
                     bucket_id = self.numel_per_bucket.index(min(self.numel_per_bucket)) # the bucket with minimum number of parameters so far
                     self.numel_per_bucket[bucket_id] += p.numel()
@@ -105,7 +91,8 @@ class DashLayerwise(ISTAOptimizer):
             self.buckets = params
 
     @torch.no_grad()
-    def get_current_bucket(self, get_1d=False):
+    def get_ndim_from_current_bucket(self, ndim):
+        assert ndim in [1, 2]
         if dist.is_initialized():
             rank = dist.get_rank()
             looping_list = self.buckets[rank]
@@ -113,10 +100,7 @@ class DashLayerwise(ISTAOptimizer):
             looping_list = self.buckets
 
         for index, group, state, p in looping_list:
-            if get_1d:
-                if p.ndim == 1:
-                    yield index, group, state, p
-            else:
+            if p.ndim == ndim:
                 yield index, group, state, p
 
     @override
@@ -124,32 +108,11 @@ class DashLayerwise(ISTAOptimizer):
         cfg: DashConfig = self.config
         algo_one_dim = cfg.algo_one_dim
 
-        ##### UPDATE 2D layers and 1D layers with AdamW
-        for index, group, state, p in self.get_current_bucket():
-            ndim = p.ndim
-            if (ndim == 2) or (ndim == 1 and algo_one_dim == DashAlgoOneDim.ADAMW):
-                state[STATE_PROCESSOR] = DashLayerProcessor(
-                    param=p,
-                    cfg=self.config,
-                    is_norm_layer_stack=False, # important !!!
-                    name=f'{index:03d}')
-            elif ndim not in [1, 2]:
-                raise RuntimeError(f'Efficient Shampoo is currently implemented only for 1D and 2D layers')
+        bucket_func_1d = partial(self.get_ndim_from_current_bucket, ndim=1)
+        bucket_func_2d = partial(self.get_ndim_from_current_bucket, ndim=2)
 
-        ##### UPDATE 1D layers with Shampoo (AdaGrad)
-        if algo_one_dim == DashAlgoOneDim.SHAMPOO:
-            pool = [p for index, group, state, p in self.get_current_bucket(get_1d=True)]
-            N = len(pool)
-            E = pool[0].shape[0] # this is embedding size
-            dtype = pool[0].dtype
-            device = pool[0].device
-
-            self.norm_layers_stack = DashFakeParam(shape=(N, E, 1), dtype=dtype, device=device)
-            self.norm_layers_processor = DashLayerProcessor(
-                param=self.norm_layers_stack,
-                cfg=self.config,
-                is_norm_layer_stack=True, # important !!!
-                name=f'norm-layers-stack')
+        self.dash_processor_1d = DashGpuProcessor1D(bucket_func=bucket_func_1d, cfg=cfg)
+        self.dash_processor_2d = DashGpuProcessor2D(bucket_func=bucket_func_2d, cfg=cfg)
 
     @override
     @torch.no_grad()
@@ -159,52 +122,20 @@ class DashLayerwise(ISTAOptimizer):
         At the end, we sync all updated parameters across all ranks
         """
         cfg = self.config
-        algo_one_dim = cfg.algo_one_dim
 
-        ##### UPDATE 2D layers and 1D layers with AdamW
-        for index, group, state, p in self.get_current_bucket():
-            ndim = p.ndim
-            if (ndim == 2) or (ndim == 1 and algo_one_dim == DashAlgoOneDim.ADAMW):
-                lr = group['lr']
-                wd = group['weight_decay']
+        ##### Apply weight decay to 2D layers
+        for index, group, state, p in self.get_ndim_from_current_bucket(ndim=2):
+            lr = group['lr'] # this will also be available after the for-loop
+            wd = group['weight_decay']
 
-                # apply weight decay only for 2D layers
-                if (ndim == 2) and (wd > 0):
-                    p.mul_(1 - lr * wd)
+            # apply weight decay only for 2D layers
+            if wd > 0:
+                p.mul_(1 - lr * wd)
+        # end for
 
-                state[STATE_PROCESSOR].update_layer(t=self.optim_steps, lr=lr)
-
-        ##### UPDATE 1D layers with Shampoo (AdaGrad)
-        if algo_one_dim == DashAlgoOneDim.SHAMPOO:
-            nls = self.norm_layers_stack
-            ########################################
-            ##### STEP 1
-            ##### Update the fake tensor object `norm_layers_stack`:
-            ##### the gradient of each normalization layer  of shape (E,)
-            ##### will be placed in `norm_layers_stack` at index  `nli`
-            ##### in both p and grad fields
-            ########################################
-            for nli, (index, group, state, p) in enumerate(self.get_current_bucket(get_1d=True)): # nli stands for norm-layer-index
-                nls.p[nli, :, 0].copy_(p)
-                nls.grad[nli, :, 0].copy_(p.grad)
-
-            ########################################
-            ##### STEP 2
-            ##### Call update_layer on the processor, which has the flag `is_norm_layer_stack=True`
-            ##### It should handle this particular layer correctly: it won't check the grad field,
-            ##### but will work directly with the values, which are already gradients set in Step 1
-            ########################################
-            self.norm_layers_processor.update_layer(t=self.optim_steps, lr=lr)
-
-            ########################################
-            ##### STEP 3
-            ##### The call update_layer on the processor will update the `p` field in the DashFakeParam object
-            ##### Now we need to copy back from the `p` field of the DashFakeParam to actual model parameters
-            ##### This step can be seen as the reverse of STEP 1
-            ########################################
-            for nli, (index, group, state, p) in enumerate(self.get_current_bucket(get_1d=True)): # nli stands for norm-layer-index
-                p.copy_(nls.p[nli, :, 0])
-                # p.grad.copy_(nls.grad[nli, :, 0]) # no need to copy the gradient
+        ##### UPDATE 1D & 2D layers with Shampoo (AdaGrad)
+        self.dash_processor_1d.update_layer(t=self.optim_steps, lr=lr)
+        self.dash_processor_2d.update_layer(t=self.optim_steps, lr=lr)
 
         self.sync_params()
 
@@ -213,7 +144,7 @@ class DashLayerwise(ISTAOptimizer):
         if dist.is_initialized():
            # iterate through all parameters
            for _, _, p in self.loop_params(check_grad=False):
-               owner = self.owners.get(id(p), None)
+               owner = self.owners[id(p)]
                if owner is not None:
                    dist.broadcast(p.data, src=owner)
 
@@ -223,13 +154,9 @@ class DashLayerwise(ISTAOptimizer):
         This EXPENSIVE function is designed to be called outside of optimizer step.
         This way, the running time of optimizer step is not affected.
         """
-        algo_one_dim = self.config.algo_one_dim
-        if algo_one_dim == DashAlgoOneDim.ADAMW:
-            for index, group, state, p in self.get_current_bucket():
-                if (ndim == 2) or (ndim == 1 and algo_one_dim == DashAlgoOneDim.ADAMW):
-                    state[STATE_PROCESSOR].log_stats(t=self.optim_steps)
-        elif algo_one_dim == DashAlgoOneDim.SHAMPOO:
-            self.norm_layers_processor.log_stats(t=self.optim_steps)
+        t = self.optim_steps
+        self.dash_processor_1d.log_stats(t)
+        self.dash_processor_2d.log_stats(t)
 
     @torch.no_grad()
     def log_bucket_stats(self, path):
@@ -251,8 +178,3 @@ class DashLayerwise(ISTAOptimizer):
                     indexes = ','.join([str(index) for index, group, state, p in bucket_content])
                     params_per_bucket = self.numel_per_bucket[bucket_id]
                     w.write(f'\trank {bucket_id} ({params_per_bucket:_} params): {indexes}\n')
-                # w.write(f'\n\n\n1d params:\n')
-                # for bucket_id, ids_params_1d in self.ids_params_1d.items():
-                #     indexes = ','.join([str(i) for i in ids_params_1d])
-                #     # params_per_bucket = self.numel_per_bucket[bucket_id]
-                #     w.write(f'\trank {bucket_id}: {indexes}\n')

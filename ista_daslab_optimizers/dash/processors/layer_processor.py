@@ -1,27 +1,29 @@
 import torch
-from torch import Tensor
-import math
-import wandb
-import traceback
+from torch import Tensor, bmm
 from typing import Union
+import traceback
+import wandb
 
-from .dash_layerwise_block_partitioner import *
-from .dash_configs import *
-from .dash_block_root_invertor import *
+from ..invertors import DashRootInvertor
+from ..partitioners.layer_partitioner import DashLayerPartitioner
+from ..tools import DashMatrixBlock, DashFakeParam
+from ..types import DashAlgoOneDim, DashGraftingType, DashPartitionInfo
+from ..dash_config import DashConfig
 
-class DashLayerwiseProcessor:
+
+class DashLayerProcessor:
     """
         Saves the states of Shampoo optimizer for a single layer.
-        The states L, R, Linv4, Rinv4 and A (grafting state) are saved in a BlockPartitioner object because
+        The states L, R, Linv4, Rinv4 and A (grafting state) are saved in a DashLayerwisePartitioner object because
         we want to compute statistics per block.
     """
-    def __init__(self, param: Union[Tensor, DashFakeTensorWithGrad], cfg: DashConfig, name: str, is_norm_layer_stack: bool):
+    def __init__(self, param: Union[Tensor, DashFakeParam], cfg: DashConfig, name: str, is_norm_layer_stack: bool):
         self.param = param
         self.cfg = cfg
         self.name = name
         self.is_norm_layer_stack = is_norm_layer_stack
 
-        # self.is_jorge = (cfg.inv_root_method == InverseRootMethodType.JORGE)
+        # self.is_jorge = (cfg.inv_root_method == DashInverseRootMethodType.JORGE)
 
         self._initialize()
 
@@ -48,7 +50,7 @@ class DashLayerwiseProcessor:
                     print('Running Shampoo for 1D layers!')
 
         # if 2D or (1D and Shampoo)
-        bp: DashLayerwiseBlockPartitioner = DashLayerwiseBlockPartitioner(param=self.param, B=cfg.block_size, is_norm_layer_stack=self.is_norm_layer_stack)
+        bp: DashLayerPartitioner = DashLayerPartitioner(param=self.param, B=cfg.block_size, is_norm_layer_stack=self.is_norm_layer_stack)
         self.block_partitioner = bp
 
         self.G: DashMatrixBlock = bp.get_regular_gradient_block()
@@ -77,7 +79,7 @@ class DashLayerwiseProcessor:
             self.Pgraft_fro = DashMatrixBlock(
                 shape_full=(N_full, 1, 1),
                 shape_rest=(N_rest, 1, 1) if has_rest else None,
-                info=DashBlockInfo.REGULAR_BLOCK,
+                info=DashPartitionInfo.REGULAR_BLOCK,
                 dtype=dtype,
                 device=device)
 
@@ -96,7 +98,7 @@ class DashLayerwiseProcessor:
 
             _update_factors: the paper has a typo: it uses beta2 in if, but updates L_t and R_t using beta1 (it should be beta2)
                 We use betaLR instead of beta2 in our implementation to know exactly where beta is used.
-                We perform these updates in grouped blocks (see BlockPartitioner class)
+                We perform these updates in grouped blocks (see DashLayerwisePartitioner class)
                 Algorithm:
                     if betaLR < 1 then
                         L_t = betaLR L_t-1 + (1 - betaLR) G_t     @ G_t ^ T
@@ -184,7 +186,7 @@ class DashLayerwiseProcessor:
     def _update_factors(self):
         """
         We use betaLR instead of beta2 in our implementation to know exactly where beta is used.
-        We perform these updates in grouped blocks (see BlockPartitioner class).
+        We perform these updates in grouped blocks (see DashLayerwisePartitioner class).
 
         We use efficient grouping and save L and R blocks in self.LR
 
@@ -217,17 +219,17 @@ class DashLayerwiseProcessor:
 
         Gfull = G.full
         Gfull_T = Gfull.transpose(1, 2) # call contiguous for Dion kernel
-        Lfull = torch.bmm(Gfull, Gfull_T) # G @ G.T # TODO: add Dion kernel here
+        Lfull = bmm(Gfull, Gfull_T) # G @ G.T
         if is_2d:
-            Rfull = torch.bmm(Gfull_T, Gfull) # G.T @ G# TODO: add Dion kernel here
+            Rfull = bmm(Gfull_T, Gfull) # G.T @ G
 
         if has_rest:
             N_rest = self.block_partitioner.num_blocks_rest # if gradient has a rest block, then L and R will also have
             Grest = G.rest
             Grest_T = Grest.transpose(1, 2) # call contiguous for Dion kernel
-            Lrest = torch.bmm(Grest, Grest_T) # G @ G.T # TODO: add Dion kernel here
+            Lrest = bmm(Grest, Grest_T) # G @ G.T
             if is_2d:
-                Rrest = torch.bmm(Grest_T, Grest) # G.T @ G # TODO: add Dion kernel here
+                Rrest = bmm(Grest_T, Grest) # G.T @ G
 
         # unpacking by simple indexing: these two slices will always be the same size
         slice_Lfull = LR.full[0: Nfull]
@@ -237,16 +239,16 @@ class DashLayerwiseProcessor:
         #     slice_barLfull = barLR.full[0: Nfull]
         #     slice_barRfull = barLR.full[Nfull: 2 * Nfull]
 
-        if info == DashBlockInfo.REGULAR_BLOCK:
+        if info == DashPartitionInfo.REGULAR_BLOCK:
             # do nothing
             # for 1D, self.LR contains only the L preconditioner, which is a regular block
             pass
-        elif info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_NO_REST:
+        elif info == DashPartitionInfo.NO_REST:
             # do nothing because we have no rest
             # slice_Lrest = None
             # slice_Rrest = None
             pass
-        elif info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_R_AND_REST_L:
+        elif info == DashPartitionInfo.REST_L:
             # full contains L_full, R_full, R_rest
             # rest contains L_rest
             slice_Rrest = LR.full[2 * Nfull:] # packed next to the full blocks
@@ -257,7 +259,7 @@ class DashLayerwiseProcessor:
             #     slice_barRrest = barLR.full[2 * Nfull:] # packed next to the full blocks
             #     if has_rest:
             #         slice_barLrest = barLR.rest
-        elif info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_L_AND_REST_R:
+        elif info == DashPartitionInfo.REST_R:
             # full contains L_full, R_full, L_rest
             # rest contains R_rest
             if has_rest:
@@ -356,11 +358,11 @@ class DashLayerwiseProcessor:
         start_prec_step = cfg.start_prec_step
         inv_root_freq = cfg.inv_root_freq
         if t >= start_prec_step and (t == 1 or t % inv_root_freq == 0):
-            ret = DashBlockRootInvertor.invert(Xin=self.LR, Xout=self.barLR, cfg=cfg, root=2 if self.is_norm_layer_stack else 4)
+            DashRootInvertor.invert(Xin=self.LR, Xout=self.barLR, cfg=cfg, root=2 if self.is_norm_layer_stack else 4)
             # if ret is not None:
             #     name = self.name
             #     shape = tuple(self.param.shape)
-            #     wandb.log({ # TODO: THIS AFFECTS RUNNING TIME OF OPTIMIZER STEP, FIND A WAY TO LOG THIS INFO IN log_stats
+            #     wandb.log({ # this is just to debug the RELU heuristic for EVD
             #         't': t,
             #         f'stats/{name}_{shape}_ranks_eig_vals_full': wandb.Histogram(self._wandbify(ret, op='vector')),
             #         f'stats/{name}_{shape}_ranks_eig_vals_full_min': ret.min().item(),
@@ -491,12 +493,12 @@ class DashLayerwiseProcessor:
             if GorTildeG.has_rest:
                 info = barLR.info
 
-                if info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_R_AND_REST_L:
+                if info == DashPartitionInfo.REST_L:
                     # full contains L_full, R_full, R_rest
                     # rest contains L_rest
                     Rinv_rest = self.barLR.full[2 * Nfull:]  # packed next to the full blocks
                     Linv_rest = self.barLR.rest
-                elif info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_L_AND_REST_R:
+                elif info == DashPartitionInfo.REST_R:
                     # full contains L_full, R_full, L_rest
                     # rest contains R_rest
                     Rinv_rest = self.barLR.rest
@@ -673,7 +675,7 @@ class DashLayerwiseProcessor:
                 if G.has_rest:  # add stats for REST blocks
                     info = LR.info
 
-                    if info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_R_AND_REST_L:
+                    if info == DashPartitionInfo.REST_L:
                         # full contains L_full, R_full, R_rest
                         # rest contains L_rest
 
@@ -684,7 +686,7 @@ class DashLayerwiseProcessor:
                         if is_2d:
                             slice_Rinv_rest = barLR.full[2 * Nfull:]  # packed next to the full blocks
                         slice_Linv_rest = barLR.rest
-                    elif info == DashBlockInfo.EFFICIENT_BLOCK_GROUPING_FULL_LR_REST_L_AND_REST_R:
+                    elif info == DashPartitionInfo.REST_R:
                         # full contains L_full, R_full, L_rest
                         # rest contains R_rest
 
