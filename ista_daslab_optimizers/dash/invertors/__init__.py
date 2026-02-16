@@ -9,8 +9,6 @@ from ..types import DashInverseRootMethodType
 from .inv_cbshv import DashRootInvChebyshev
 from .inv_cn import DashRootInvCoupledNewton
 from .inv_evd import DashRootInvEVD
-from .inv_jorge import DashRootInvJorge
-from .inv_lrpi import DashRootInvLowRankPowerIter
 from .inv_ndb import DashRootInvNewtonDB
 
 class DashRootInvertor:
@@ -24,14 +22,10 @@ class DashRootInvertor:
                 func = DashRootInvEVD._matrix_root_inv_evd
             case DashInverseRootMethodType.CN:
                 func = DashRootInvCoupledNewton._matrix_root_inv_coupled_newton
-            case DashInverseRootMethodType.JORGE:
-                func = DashRootInvJorge._matrix_root_inv_jorge
             case DashInverseRootMethodType.CBSHV:
                 func = DashRootInvChebyshev._matrix_root_inv_chebyshev
             case DashInverseRootMethodType.NDB:
                 func = DashRootInvNewtonDB._matrix_root_inv_newton_db
-            case DashInverseRootMethodType.LRPI:
-                func = DashRootInvLowRankPowerIter._matrix_root_inv_low_rank_power_iter
             case _:
                 raise RuntimeError(f'Invalid method: {method}')
         # end match-case

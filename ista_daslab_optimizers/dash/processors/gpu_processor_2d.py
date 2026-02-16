@@ -203,7 +203,6 @@ class DashGpuProcessor2D:
             - torch.linalg.eigh, followed by some spectrum post-processing and matmuls
             - Chebyshev
             - Newton-DB
-            - Jorge
         Algorithm:
             if 𝑡 ≥ start_preconditioning_step and 𝑡 % precondition_frequency = 0:
                 bar(L)_t =  ComputeMatrixRootInverse(L_t , eps, t, use_bias_correction)

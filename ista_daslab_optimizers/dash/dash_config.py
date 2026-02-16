@@ -44,7 +44,3 @@ class DashConfig:
 
     ### Chebyshev (CBSHV)
     cbshv_degree: int = 20
-
-    ### Low-Rank Power-Iter (LRPI)
-    lrpi_rank: int = 100
-    lrpi_steps: int = 10

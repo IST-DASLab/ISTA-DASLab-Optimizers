@@ -23,8 +23,6 @@ class DashLayerProcessor:
         self.name = name
         self.is_norm_layer_stack = is_norm_layer_stack
 
-        # self.is_jorge = (cfg.inv_root_method == DashInverseRootMethodType.JORGE)
-
         self._initialize()
 
     @torch.no_grad()
@@ -61,12 +59,6 @@ class DashLayerProcessor:
         # efficient grouping of L and R into a single MatrixBlock
         self.LR: DashMatrixBlock = bp.get_preconditioner_blocks_efficiently_grouped()
         self.barLR: DashMatrixBlock = bp.get_preconditioner_blocks_efficiently_grouped()
-
-        # if self.is_jorge: # initialize barLR only for Jorge
-        #     eps_pow = cfg.eps_inv_root ** (-0.25)
-        #     self.barLR.full.diagonal(dim1=-2, dim2=-1).add_(eps_pow)
-        #     if has_rest:
-        #         self.barLR.rest.diagonal(dim1=-2, dim2=-1).add_(eps_pow)
 
         if cfg.grafting_type in [DashGraftingType.ADAGRAD, DashGraftingType.ADAM]:
             self.A: DashMatrixBlock = bp.get_regular_gradient_block() # this is A_t^(i) in Algorithm 2
@@ -119,7 +111,6 @@ class DashLayerProcessor:
                     - torch.linalg.eigh, followed by some spectrum post-processing and matmuls
                     - Chebyshev
                     - Newton-DB
-                    - Jorge
                 Algorithm:
                     if 𝑡 ≥ start_preconditioning_step and 𝑡 % precondition_frequency = 0:
                         bar(L)_t =  ComputeMatrixRootInverse(L_t , eps, t, use_bias_correction)
@@ -198,15 +189,7 @@ class DashLayerProcessor:
                 L_t = L_t-1 + G_t     @ G_t ^ T
                 R_t = R_t-1 + G_t ^ T @ G_t
             end if
-        Algorithm for Jorge:
-            This function should update X_L/R from Jorge
-            - L/R from Shampoo will store X_L/R from Jorge
-            - barL/barR from Shampoo will store hat(L)/hat(R) from Jorge (the estimations of inverse 4-th root)
-
-            L_t = hat(L)_t-1 ^ 4   @   G_t     @   G_t^T (this is X_L)
-            R_t = hat(R)_t-1 ^ 4   @   G_t^T   @   G_t   (this is X_R)
         """
-        # is_jorge = self.is_jorge
         G = self.G
         Nfull = self.block_partitioner.num_blocks_full
         has_rest = G.has_rest
@@ -218,7 +201,7 @@ class DashLayerProcessor:
         is_2d = not self.is_norm_layer_stack
 
         Gfull = G.full
-        Gfull_T = Gfull.transpose(1, 2) # call contiguous for Dion kernel
+        Gfull_T = Gfull.transpose(1, 2)
         Lfull = bmm(Gfull, Gfull_T) # G @ G.T
         if is_2d:
             Rfull = bmm(Gfull_T, Gfull) # G.T @ G
@@ -226,7 +209,7 @@ class DashLayerProcessor:
         if has_rest:
             N_rest = self.block_partitioner.num_blocks_rest # if gradient has a rest block, then L and R will also have
             Grest = G.rest
-            Grest_T = Grest.transpose(1, 2) # call contiguous for Dion kernel
+            Grest_T = Grest.transpose(1, 2)
             Lrest = bmm(Grest, Grest_T) # G @ G.T
             if is_2d:
                 Rrest = bmm(Grest_T, Grest) # G.T @ G
@@ -235,9 +218,6 @@ class DashLayerProcessor:
         slice_Lfull = LR.full[0: Nfull]
         if is_2d:
             slice_Rfull = LR.full[Nfull: 2 * Nfull]
-        # if is_jorge:
-        #     slice_barLfull = barLR.full[0: Nfull]
-        #     slice_barRfull = barLR.full[Nfull: 2 * Nfull]
 
         if info == DashPartitionInfo.REGULAR_BLOCK:
             # do nothing
@@ -254,11 +234,6 @@ class DashLayerProcessor:
             slice_Rrest = LR.full[2 * Nfull:] # packed next to the full blocks
             if has_rest:
                 slice_Lrest = LR.rest
-
-            # if is_jorge:
-            #     slice_barRrest = barLR.full[2 * Nfull:] # packed next to the full blocks
-            #     if has_rest:
-            #         slice_barLrest = barLR.rest
         elif info == DashPartitionInfo.REST_R:
             # full contains L_full, R_full, L_rest
             # rest contains R_rest
@@ -266,54 +241,27 @@ class DashLayerProcessor:
                 slice_Rrest = LR.rest
             slice_Lrest = LR.full[2 * Nfull:]  # packed next to the full blocks
 
-            # if is_jorge:
-            #     if has_rest:
-            #         slice_barRrest = barLR.rest
-            #     slice_barLrest = barLR.full[2 * Nfull:]  # packed next to the full blocks
 
-        if False: # self.is_jorge:
-            pass # code for Jorge
-            # pow2_slice_barLfull = bmm(slice_barLfull, slice_barLfull)
-            # pow4_slice_barLfull = bmm(pow2_slice_barLfull, pow2_slice_barLfull)
-            # slice_Lfull.copy_(bmm(pow4_slice_barLfull, Lfull))
-            #
-            # pow2_slice_barRfull = bmm(slice_barRfull, slice_barRfull)
-            # pow4_slice_barRfull = bmm(pow2_slice_barRfull, pow2_slice_barRfull)
-            # slice_Rfull.copy_(bmm(pow4_slice_barRfull, Rfull))
-            #
-            # del pow2_slice_barLfull, pow4_slice_barLfull, pow2_slice_barRfull, pow4_slice_barRfull
-            #
-            # if has_rest:
-            #     pow2_slice_barLrest = bmm(slice_barLrest, slice_barLrest)
-            #     pow4_slice_barLrest = bmm(pow2_slice_barLrest, pow2_slice_barLrest)
-            #     slice_Lrest.copy_(bmm(pow4_slice_barLrest, Lrest))
-            #
-            #     pow2_slice_barRrest = bmm(slice_barRrest, slice_barRrest)
-            #     pow4_slice_barRrest = bmm(pow2_slice_barRrest, pow2_slice_barRrest)
-            #     slice_Rrest.copy_(bmm(pow4_slice_barRrest, Rrest))
-            #
-            #     del pow2_slice_barLrest, pow4_slice_barLrest, pow2_slice_barRrest, pow4_slice_barRrest
-        else: # shampoo
-            if betaLR < 1:
-                one_minus_betaLR = 1 - betaLR
+        if betaLR < 1:
+            one_minus_betaLR = 1 - betaLR
 
-                slice_Lfull.lerp_(Lfull, weight=one_minus_betaLR)
+            slice_Lfull.lerp_(Lfull, weight=one_minus_betaLR)
+            if has_rest:
+                slice_Lrest.lerp_(Lrest, weight=one_minus_betaLR)
+
+            if is_2d:
+                slice_Rfull.lerp_(Rfull, weight=one_minus_betaLR)
                 if has_rest:
-                    slice_Lrest.lerp_(Lrest, weight=one_minus_betaLR)
+                    slice_Rrest.lerp_(Rrest, weight=one_minus_betaLR)
+        else:
+            slice_Lfull.add_(Lfull)
+            if has_rest:
+                slice_Lrest.add_(Lrest)
 
-                if is_2d:
-                    slice_Rfull.lerp_(Rfull, weight=one_minus_betaLR)
-                    if has_rest:
-                        slice_Rrest.lerp_(Rrest, weight=one_minus_betaLR)
-            else:
-                slice_Lfull.add_(Lfull)
+            if is_2d:
+                slice_Rfull.add_(Rfull)
                 if has_rest:
-                    slice_Lrest.add_(Lrest)
-
-                if is_2d:
-                    slice_Rfull.add_(Rfull)
-                    if has_rest:
-                        slice_Rrest.add_(Rrest)
+                    slice_Rrest.add_(Rrest)
 
     @torch.no_grad()
     def _update_grafting(self):
@@ -347,7 +295,6 @@ class DashLayerProcessor:
             - torch.linalg.eigh, followed by some spectrum post-processing and matmuls
             - Chebyshev
             - Newton-DB
-            - Jorge
         Algorithm:
             if 𝑡 ≥ start_preconditioning_step and 𝑡 % precondition_frequency = 0:
                 bar(L)_t =  ComputeMatrixRootInverse(L_t , eps, t, use_bias_correction)
