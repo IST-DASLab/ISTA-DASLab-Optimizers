@@ -52,7 +52,7 @@ class DashGpuProcessor1D:
         assert cfg.grafting_type == DashGraftingType.ADAM
         B = cfg.block_size
 
-        p0 = next(self.bucket_func())[-1]  # the generator bucket_func() yields (index, group, state, p)
+        p0 = next(self.bucket_func())[3]  # the generator bucket_func() yields (index, group, state, p, psq, psq2d)
         dtype = p0.dtype
         device = p0.device
 
@@ -69,9 +69,7 @@ class DashGpuProcessor1D:
         # this is a multi-shape object that specifies the shapes of each (G/L/R/LR)(full/rest) construction
         self.shape_stacked: DashMultiShape = DashShapesCalculator.get_stacked_shapes_for_merged_norm_layers(self.shape_raw, B)
 
-        print(f'[rank={rank}] shape_full_1d: '
-              f'shape_raw: {self.shape_raw} '
-              f'shape_stacked: {self.shape_stacked}')
+        print(f'[rank={rank}] shape_raw: {self.shape_raw}, shape_stacked: {self.shape_stacked}')
 
         self.G = zeros(self.shape_stacked.Gfull.as_tuple())
         self.L = zeros(self.shape_stacked.Lfull.as_tuple())
@@ -138,8 +136,8 @@ class DashGpuProcessor1D:
         g_view = self.shape_stacked.Gfull // N
         batch_size = g_view.b  # this will be 2
         gi = 0  # pointer in the self.G_full buffer
-        for pi, group, state, p in self.bucket_func():  # gi/pi = global/param index
-            self.G[gi: gi + batch_size].copy_(p.grad.view(g_view.as_tuple()))
+        for pi, group, state, p, psq, psq2d in self.bucket_func():  # gi/pi = global/param index
+            self.G[gi: gi + batch_size].copy_(p.grad.squeeze().view(g_view.as_tuple()))
             gi += batch_size  # advance pointer
 
     @torch.no_grad()
@@ -360,7 +358,7 @@ class DashGpuProcessor1D:
         batch_size = g_view.b  # this will be 2
 
         i = 0 # indexes self.U
-        for index, group, state, p in self.bucket_func():
+        for index, group, state, p, psq, psq2d in self.bucket_func():
             u = U[i : i + batch_size].view_as(p)
             i += batch_size
             p.add_(u, alpha=-lr)

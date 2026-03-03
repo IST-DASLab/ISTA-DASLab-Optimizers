@@ -208,14 +208,6 @@ class DashLayerwise(ISTAOptimizer):
 
         self.sync_params()
 
-    @torch.no_grad()
-    def sync_params(self):
-        if dist.is_initialized():
-           # iterate through all parameters
-           for _, _, p in self.loop_params(check_grad=False):
-               owner = self.owners.get(id(p), None)
-               if owner is not None:
-                   dist.broadcast(p.data, src=owner)
 
     @torch.no_grad()
     def log_layer_stats(self):
@@ -231,28 +223,3 @@ class DashLayerwise(ISTAOptimizer):
         elif algo_one_dim == DashAlgoOneDim.SHAMPOO:
             self.norm_layers_processor.log_stats(t=self.optim_steps)
 
-    @torch.no_grad()
-    def log_bucket_stats(self, path):
-        if dist.is_initialized():
-            rank = dist.get_rank()
-            if rank == 0:
-                params = sorted([
-                    (index, group, state, p)  # also save the index!
-                    for index, (group, state, p) in enumerate(self.loop_params(check_grad=False))
-                ], key=lambda x: x[3].numel(), reverse=True)  # sort DESC by number of elements
-
-                with open(os.path.join(path, f'general_layer_stats_rank={rank}.txt'), 'w') as w:
-                    for index, group, state, p in params:
-                        w.write(f'{index}: {tuple(p.shape)} => {p.numel():_}\n')
-
-            with open(os.path.join(path, f'bucket_stats_rank={rank}.txt'), 'w') as w:
-                w.write(f'Buckets for rank {rank}:\n')
-                for bucket_id, bucket_content in self.buckets.items():
-                    indexes = ','.join([str(index) for index, group, state, p in bucket_content])
-                    params_per_bucket = self.numel_per_bucket[bucket_id]
-                    w.write(f'\trank {bucket_id} ({params_per_bucket:_} params): {indexes}\n')
-                # w.write(f'\n\n\n1d params:\n')
-                # for bucket_id, ids_params_1d in self.ids_params_1d.items():
-                #     indexes = ','.join([str(i) for i in ids_params_1d])
-                #     # params_per_bucket = self.numel_per_bucket[bucket_id]
-                #     w.write(f'\trank {bucket_id}: {indexes}\n')

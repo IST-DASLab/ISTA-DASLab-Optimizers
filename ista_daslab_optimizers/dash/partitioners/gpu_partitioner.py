@@ -23,7 +23,7 @@ class DashGpuPartitioner:
 
         full = full_block.view(num_row_blocks, num_col_blocks, B, B)
         full = full.transpose(1, 2)  # (num_row_blocks, B, num_col_blocks, B)
-        out[:R_full, :C_full].copy_(full.reshape(R_full, C_full))
+        out[:R_full, :C_full].copy_(full.reshape(R_full, C_full).view(R_full, C_full))
         
         if rest_block is not None:
             if col_rest > 0: # Case A: remainder in columns (shape: (num_row_blocks, B, col_rest))

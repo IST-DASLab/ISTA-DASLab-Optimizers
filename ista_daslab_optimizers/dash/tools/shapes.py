@@ -226,7 +226,7 @@ class DashShapesCalculator:
         this function returns the blockified shape for the gradient.
         For example, if (N,E) = (33, 2048), this function returns (N, E, 1).
         """
-        pool = [p for index, group, state, p in bucket_func()]
+        pool = [psq for index, group, state, p, psq, psq2d in bucket_func()]
         N = len(pool)  # number of normalization layers
         E = pool[0].shape[0]  # embedding size
         return DashShape3D(N, E, 1)
@@ -290,8 +290,8 @@ class DashShapesCalculator:
         LR = { # dictionary where key=b or B and value = N: b is the rest size (b < B) and N is the 0-th (batch) dimension of DASHrest
             (B, B): DashShape3D(0, B, B), # will add shapes to the batch dimension
         }
-        for index, group, state, p in bucket_func():
-            pshape = DashShapesCalculator.get_stacked_shapes_per_single_linear_layer(shape=p.shape, B=B)
+        for index, group, state, p, psq, psq2d in bucket_func():
+            pshape = DashShapesCalculator.get_stacked_shapes_per_single_linear_layer(shape=psq2d.shape, B=B)
             # Gfull += pshape.Gfull # adds only batch dimensions
             # LRfull += pshape.LRfull # adds only batch dimensions
             G[(B, B)] += pshape.Gfull

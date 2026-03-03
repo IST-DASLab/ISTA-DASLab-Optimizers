@@ -77,6 +77,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.13** @ March 3rd, 2026:
+  - added support for any layer shape: squeeze parameters, then reshape 3D and 4D layers to 2D
 - **1.1.12** @ February 15th, 2026:
   - refactory for DASH: separated entities to different files and implemented **DashGpu**, as well as
   a triton kernel to compute `L_t = beta * L_t-1 + (1-beta) * G @ G.T` and `R_t = beta * R_t-1 + (1-beta) * G.T @ G` in-place

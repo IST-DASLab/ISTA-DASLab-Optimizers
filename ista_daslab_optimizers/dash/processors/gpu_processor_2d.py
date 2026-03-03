@@ -51,7 +51,7 @@ class DashGpuProcessor2D:
         assert cfg.grafting_type == DashGraftingType.ADAM
         B = cfg.block_size
 
-        p0 = next(self.bucket_func())[-1] # the generator bucket_func() yields (index, group, state, p)
+        p0 = next(self.bucket_func())[3] # the generator bucket_func() yields (index, group, state, p, psq, psq2d)
         dtype = p0.dtype
         device = p0.device
 
@@ -63,8 +63,8 @@ class DashGpuProcessor2D:
 
         rank = dist.get_rank() if dist.is_initialized() else 0
 
-        for index, group, state, p in self.bucket_func():
-            state[STATE_DASH_SHAPE]: DashMultiShape = DashShapesCalculator.get_stacked_shapes_per_single_linear_layer(shape=p.shape, B=cfg.block_size)
+        for index, group, state, p, psq, psq2d in self.bucket_func():
+            state[STATE_DASH_SHAPE]: DashMultiShape = DashShapesCalculator.get_stacked_shapes_per_single_linear_layer(shape=psq2d.shape, B=cfg.block_size)
         # end for
 
         self.shape_G, self.shape_LR = DashShapesCalculator.get_stacked_shape_for_all_linear_layers(self.bucket_func, B)
@@ -103,9 +103,9 @@ class DashGpuProcessor2D:
         G: DashStackedBlocksHandler = self.G
         G.reset_stacking_indices() # important when we update the stacked blocks
 
-        for pi, group, state, p in self.bucket_func():
-            g = p.grad # 2D gradient (capital G is reserved for the stacked blocks
-            R, C = p.shape
+        for pi, group, state, p, psq, psq2d in self.bucket_func():
+            g = p.grad.squeeze().view_as(psq2d) # 2D gradient (capital G is reserved for the stacked blocks)
+            R, C = psq2d.shape
             blockified_shape: DashMultiShape = state[STATE_DASH_SHAPE]  # the current layer has this blockified shape
 
             R_full = blockified_shape.stats.R_full
@@ -369,7 +369,7 @@ class DashGpuProcessor2D:
         # update weights using update U
         U.reset_unstacking_indices() # important when we update the UNstacked blocks
 
-        for index, group, state, p in self.bucket_func():
+        for index, group, state, p, psq, psq2d in self.bucket_func():
             multi_shape: DashMultiShape = state[STATE_DASH_SHAPE]
 
             Nfull, Rfull, Cfull = multi_shape.Gfull
