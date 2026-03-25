@@ -68,7 +68,6 @@ class DashGpu(DashBase):
     @override
     def init_optimizer_states(self):
         cfg: DashConfig = self.config
-        algo_one_dim = cfg.algo_one_dim
 
         if self._optim_set_contains_dim(num_dims=1):
             bucket_func_1d = partial(self.get_ndim_params_from_current_bucket, ndim=1)

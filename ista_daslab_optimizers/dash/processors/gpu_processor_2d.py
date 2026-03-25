@@ -8,7 +8,7 @@ import sys
 
 from ..invertors import DashRootInvertor
 from ..partitioners import DashGpuPartitioner
-from ..tools import DashMultiShape, DashShapesCalculator, DashMatrixBlock, DashStackedBlocksHandler
+from ..tools import DashMultiShape, DashShapesCalculator, DashMatrixBlock, DashStackedBlocksHandler, DashShape3D
 from ..types import DashGraftingType, DashPartitionInfo
 from ..dash_config import DashConfig
 

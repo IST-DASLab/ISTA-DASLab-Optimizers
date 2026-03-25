@@ -25,21 +25,22 @@ class DashRootInvNewtonDB:
             case _:
                 raise RuntimeError(f'NewtonDB is not implemented for dtype {matmul_dtype}')
 
-        # eye = torch.eye(inp.shape[1], dtype=inp.dtype, device=inp.device)
-        # inp_reg = inp + cfg.eps_inv_root * eye
-        # del eye
+        eye = torch.eye(inp.shape[1], dtype=inp.dtype, device=inp.device)
+        inp_reg = inp + cfg.eps_inv_root * eye
+        del eye
 
-        scale = DashMatrixScaling.get_matrix_scaling(inp, cfg)
+        scale = DashMatrixScaling.get_matrix_scaling(inp_reg, cfg)
 
         if root == 2:
-            func(inp=inp, out=out, cfg=cfg, scale=scale, return_type=DashNdbReturnType.INV_SQRT)
+            func(inp=inp_reg, out=out, cfg=cfg, scale=scale, return_type=DashNdbReturnType.INV_SQRT)
         elif root == 4:
             inp_sqrt = torch.empty_like(out) # create temp tensor for the square root
-            func(inp=inp,      out=inp_sqrt, cfg=cfg, scale=scale,        return_type=DashNdbReturnType.SQRT)
+            func(inp=inp_reg,  out=inp_sqrt, cfg=cfg, scale=scale,        return_type=DashNdbReturnType.SQRT)
             func(inp=inp_sqrt, out=out,      cfg=cfg, scale=scale.sqrt(), return_type=DashNdbReturnType.INV_SQRT)
             del inp_sqrt
         else:
             raise RuntimeError(f'NewtonDB implements logic only for inverse 2nd and 4th roots, but got root={root}!')
+        del inp_reg
 
     @staticmethod
     @torch.no_grad()

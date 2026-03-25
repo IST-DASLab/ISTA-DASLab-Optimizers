@@ -77,6 +77,8 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.14** @ March 25th, 2026:
+  - added regularization for NewtonDB
 - **1.1.13** @ March 3rd, 2026:
   - added support for any layer shape: squeeze parameters, then reshape 3D and 4D layers to 2D
 - **1.1.12** @ February 15th, 2026:
