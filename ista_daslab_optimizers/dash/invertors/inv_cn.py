@@ -57,15 +57,15 @@ class DashRootInvCoupledNewton:
         identity = torch.eye(B, dtype=inp.dtype, device=inp.device).expand(N, B, B)
 
         # add regularization
-        A_reg = inp.add(identity, alpha=eps)
+        inp_reg = inp.add(identity, alpha=eps)
 
         # initialize matrices
 
-        scale = DashMatrixScaling.get_matrix_scaling(inp, cfg)
+        scale = DashMatrixScaling.get_matrix_scaling(inp_reg, cfg)
         z = (root + 1) / (2 * scale)
         X = z ** (-alpha) * identity
-        M = z * A_reg
-        error = torch.dist(M, identity, p=torch.inf)
+        M = z * inp_reg
+        # error = torch.dist(M, identity, p=torch.inf)
 
         for it in range(cfg.newton_steps):
             Meye = M.mul(alpha).add_(identity, alpha=1-alpha) # convex combination of M and identity
