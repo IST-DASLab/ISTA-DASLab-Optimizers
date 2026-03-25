@@ -99,14 +99,14 @@ class DashRootInvCoupledNewton:
         identity = torch.eye(B, dtype=inp.dtype, device=inp.device).expand(N, B, B)
 
         # add regularization
-        A_reg = inp.add(identity, alpha=eps)
+        inp_reg = inp.add(identity, alpha=eps)
 
         # initialize matrices
 
-        scale = DashMatrixScaling.get_matrix_scaling(inp, cfg)
+        scale = DashMatrixScaling.get_matrix_scaling(inp_reg, cfg)
         z = (root + 1) / (2 * scale)
         X = z ** (-alpha) * identity
-        M32 = z * A_reg
+        M32 = z * inp_reg
         # error = torch.dist(M32, identity, p=torch.inf)
 
         Npow2_16 = torch.empty_like(inp, dtype=torch.float16)
@@ -153,14 +153,14 @@ class DashRootInvCoupledNewton:
         identity = torch.eye(B, dtype=inp.dtype, device=inp.device).expand(N, B, B)
 
         # add regularization
-        A_reg = inp.add(identity, alpha=eps)
+        inp_reg = inp.add(identity, alpha=eps)
 
         # initialize matrices
 
-        scale = DashMatrixScaling.get_matrix_scaling(inp, cfg)
+        scale = DashMatrixScaling.get_matrix_scaling(inp_reg, cfg)
         z = (root + 1) / (2 * scale)
         X = z ** (-alpha) * identity
-        M32 = z * A_reg
+        M32 = z * inp_reg
         # error = torch.dist(M32, identity, p=torch.inf)
 
         Npow2_16 = torch.empty_like(inp, dtype=torch.bfloat16)
