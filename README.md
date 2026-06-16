@@ -77,6 +77,12 @@ optimizer = MicroAdam(
 # Versions summary:
 
 ---
+- **1.1.15** @ June 16th, 2026:
+  - added constant `1e-16` to function `_compute_shampoo_direction` for numerical stability as in `DistributedShampoo`
+  - this need appeared in the context of using `DASH` in the `modded-nanogpt` project, where the `proj` layers are initialized with 
+    zeros, which causes some of the gradients at the first optimization step to be all zero. This makes Power-Iteration return NaNs and 
+    Shampoo update be zero, causing `NaNs` because of `0/0` case
+  - added a new config parameter called `eps_power_iter` to control the epsilon for Power-Iteration
 - **1.1.14** @ March 25th, 2026:
   - added regularization for NewtonDB
 - **1.1.13** @ March 3rd, 2026:
