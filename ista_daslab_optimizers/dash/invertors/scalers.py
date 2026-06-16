@@ -8,35 +8,38 @@ from ..types import DashMatrixScalingType
 class DashMatrixScaling:
     @staticmethod
     @torch.no_grad()
-    def get_matrix_scaling(A: Tensor, cfg: DashConfig, eps: float=1e-8):
+    def get_matrix_scaling(A: Tensor, cfg: DashConfig):
         scaling_type = cfg.matrix_scaling_type
 
         B, N, _ = A.shape
-        idx = torch.arange(N).to(A.device)
         A16 = A.bfloat16()
 
+        if scaling_type == DashMatrixScalingType.FRO:
+            scale = A16.norm(p='fro', dim=(1, 2), keepdim=True)
+            return scale
+
         ##### START EXPLANATION FOR DAMPING
-        """
-            We need to dampen the bf16 version of A because in modded-nanogpt some layers have gradient that is completely zero at the first step.
-            When inputting a zero matrix block DASH invertor, the power iteration performs 0/0 operation which results in NaNs.
-            These NaNs will then propagate to the model and therefore at the second optimization step the loss became NaN. 
-        """
-        A16[:, idx, idx] += eps
+        # We need to dampen the bf16 version of A because in modded-nanogpt some layers have gradient that is completely zero at the first step.
+        # When inputting a zero matrix block DASH invertor, the power iteration performs 0/0 operation which results in NaNs.
+        # These NaNs will then propagate to the model and therefore at the second optimization step the loss became NaN.
+
+        idx = torch.arange(N).to(A.device)
+        A16[:, idx, idx] += cfg.eps_power_iter
+
         ##### END EXPLANATION FOR DAMPING
 
         if scaling_type == DashMatrixScalingType.POWER_ITER:
-            scale, _ = DashMatrixScaling.max_eigval_power_iter(A16, num_iters=cfg.matrix_scaling_pi_steps)
-            multiplier = cfg.matrix_scaling_const
+            power_iter_fn = DashMatrixScaling.max_eigval_power_iter
         elif scaling_type == DashMatrixScalingType.POWER_ITER_MULTI:
-            scale, _ = DashMatrixScaling.max_eigval_power_iter_multi(A16, num_iters=cfg.matrix_scaling_pi_steps, num_vecs=16)
-            multiplier = cfg.matrix_scaling_const
-        elif scaling_type == DashMatrixScalingType.FRO:
-            scale = A.norm(p='fro', dim=(1, 2), keepdim=True)
-            multiplier = 1
+            power_iter_fn = DashMatrixScaling.max_eigval_power_iter_multi # num_vecs=16 implicitly
         else:
             raise RuntimeError(f'Received unknown NDBScalingType: {scaling_type}')
 
-        return scale * multiplier
+        scale, _ = power_iter_fn(A16, num_iters=cfg.matrix_scaling_pi_steps)
+
+        del A16, idx
+
+        return scale * cfg.matrix_scaling_const
 
     @staticmethod
     @torch.no_grad()
@@ -58,7 +61,7 @@ class DashMatrixScaling:
 
     @staticmethod
     @torch.no_grad()
-    def max_eigval_power_iter_multi(A: Tensor, num_iters: int, num_vecs: int):
+    def max_eigval_power_iter_multi(A: Tensor, num_iters: int, num_vecs: int=16):
         """
         Performs Power-Iteration with `num_vecs` in parallel to minimize the chances
         of converging to an eigen-vector that has a corresponding eigen-value smaller
@@ -79,7 +82,6 @@ class DashMatrixScaling:
 
         bmm(A, v, out=Av)
         eig_vals_all = (v * Av).sum(dim=1) # (N, B, num_vecs).sum(dim=1) => (N, num_vecs)
-        print(eig_vals_all)
         max_vals, max_indices = eig_vals_all.max(dim=1) # (N, num_vecs).max(dim=1) => (N,)
 
         idx_expanded = max_indices.view(N, 1, 1).expand(N, B, 1) # (N, B, 1)
