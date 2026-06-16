@@ -299,6 +299,8 @@ class DashGpuProcessor1D:
             # compute the scaling
             ### search for "1e-16" in the DistributedShampoo project and this is the place where you can find it:
             ### distributed_shampoo.py, function _precondition_and_grafting at line torch._foreach_add_(shampoo_norm_list, 1e-16)
+            ### modded-nanogpt initializes proj layers with zeros, causing gradients to be zero.
+            ### inputting zero gradients to DASH results in NaNs being created in the next line because Ushmp had norm zero
             scaling = Pgraft_fro / (Ushmp.norm(p='fro', dim=(1, 2), keepdim=True) + 1e-16)
 
             # rescale in-place
