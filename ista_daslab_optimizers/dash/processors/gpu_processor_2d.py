@@ -305,7 +305,9 @@ class DashGpuProcessor2D:
                 Ushmp = blockLinv @ blockChosenG @ blockRinv # this is unscaled
 
                 # compute the scaling
-                scaling = Pgraft_fro[shapeG] / Ushmp.norm(p='fro', dim=(1, 2), keepdim=True)
+                ### search for "1e-16" in the DistributedShampoo project and this is the place where you can find it:
+                ### distributed_shampoo.py, function _precondition_and_grafting at line torch._foreach_add_(shampoo_norm_list, 1e-16)
+                scaling = Pgraft_fro[shapeG] / (Ushmp.norm(p='fro', dim=(1, 2), keepdim=True) + 1e-16)
 
                 # rescale in-place
                 Ushmp.mul_(scaling)
