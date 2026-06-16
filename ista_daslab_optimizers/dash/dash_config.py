@@ -14,6 +14,7 @@ class DashConfig:
     beta_graft: float = 0.95 # beta used for grafting
 
     eps_inv_root: float = 1e-10
+    eps_power_iter: float = 1e-6
     inv_root_method: DashInverseRootMethodType = DashInverseRootMethodType.EVD
     inv_root_freq: int = 10
 
